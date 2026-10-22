@@ -16,8 +16,10 @@ from kasegu.core.types import (
     OrderType,
     Purpose,
     Quote,
+    Side,
     TimeInForce,
 )
+from kasegu.events import Event, EventBus
 from kasegu.exchange.rules import SymbolRules
 from kasegu.exits.trailing import ExitManager
 from kasegu.market.data import MINUTE, MarketData
@@ -25,6 +27,9 @@ from kasegu.storage.journal import Journal
 from kasegu.strategies.base import Strategy
 
 log = logging.getLogger(__name__)
+
+DAY = 86_400_000
+_LOG_LEVEL = {"info": logging.INFO, "warning": logging.WARNING, "critical": logging.ERROR}
 
 Backfill = Callable[[str, int], Awaitable[list[Kline]]]
 
@@ -46,6 +51,7 @@ class Engine:
         journal: Journal,
         backfill: Backfill | None = None,
         clock: Callable[[], int] = wall_ms,
+        events: EventBus | None = None,
     ):
         self.cfg = cfg
         self.strategy = strategy
@@ -68,6 +74,13 @@ class Engine:
         self.halted = False  # blocks new entries only
         self.blocked: set[str] = set()
         self.pending: deque[tuple[Order, Fill | None]] = deque()
+        self.events = events
+        # loss circuit breakers
+        self.day = -1  # UTC day number of day_net
+        self.day_net = 0.0
+        self.streak = 0  # consecutive losing trades
+        self.paused_until = 0  # ms, no new entries before
+        self.pause_reason = ""
         broker.listener = lambda o, f: self.pending.append((o, f))
 
     # ---- startup / recovery
@@ -76,6 +89,17 @@ class Engine:
         for s, d in self.journal.load_state().items():
             if s in self.positions.pos:
                 self.positions.pos[s] = Position.from_dict(d)
+        # today's closed trades count towards the loss limits after a restart
+        now = self.clock()
+        for t in self.journal.trades_since(now - now % DAY):
+            self._count(t["close_time"], t["pnl"] - t["fees"] + t["funding"], alert=False)
+
+    def alert(self, kind: str, s: str | None, msg: str, level: str = "info", **data):
+        """Journal, log and publish an event for alerts / outside consumers."""
+        self.journal.event(kind, s, level=level, message=msg, **data)
+        log.log(_LOG_LEVEL[level], "%s%s", f"{s} " if s else "", msg)
+        if self.events is not None:
+            self.events.publish(Event(kind, level, msg, s, self.clock(), data))
 
     async def sync(self):
         """Reconcile local state with the exchange. Exchange state wins."""
@@ -90,20 +114,31 @@ class Engine:
             await self.drain()
             pos, qty = self.positions[s], await self.broker.position_qty(s)
             if abs(qty) < 1e-12:
-                if pos.state is not PosState.FLAT:
-                    self.journal.event("sync_reset", s, local=pos.to_dict())
+                if pos.has_qty:
+                    self.alert(
+                        "position_gone",
+                        s,
+                        f"local {pos.side} {pos.qty} is flat on the exchange, state reset",
+                        "warning",
+                        local=pos.to_dict(),
+                    )
                 pos.reset()
                 self.blocked.discard(s)
                 for o in stops:
                     await self.exec.cancel(o)
-            elif not pos.has_qty or pos.side.sign * qty < 0:
-                # position without local record: keep its stops, no new entries
-                self.blocked.add(s)
-                self.journal.event("sync_unknown_position", s, qty=qty)
-                log.error("%s has exchange position %s without local state", s, qty)
             else:
+                if not pos.has_qty or pos.side.sign * qty < 0:
+                    await self._adopt(s, qty)
+                elif abs(pos.qty - abs(qty)) > 1e-12:
+                    self.alert(
+                        "position_resized",
+                        s,
+                        f"local qty {pos.qty} -> exchange {abs(qty)}",
+                        "warning",
+                    )
                 pos.qty = abs(qty)
                 pos.state = PosState.POSITION_OPEN
+                self.blocked.discard(s)
                 # adopt a matching stop from before the restart, drop the rest
                 keep = next(
                     (
@@ -194,6 +229,9 @@ class Engine:
         if st is None or self.halted or s in self.blocked:
             log.info("%s skip: %s", s, "no data" if st is None else "halted")
             return
+        if now < self.paused_until:
+            log.info("%s skip: paused (%s)", s, self.pause_reason)
+            return
         sig = self.strategy.on_bar(st)
         if sig is None:
             log.info("%s close=%s no signal (%d bars)", s, st.close[-1], len(st))
@@ -276,6 +314,14 @@ class Engine:
 
         log.info("%s %s fill %s %s @ %s", s, purpose, f.side, f.qty, f.price)
         if purpose is Purpose.ENTRY:
+            if not pos.has_qty:
+                self.alert(
+                    "entry_filled",
+                    s,
+                    f"entry {f.side} {f.qty} @ {f.price}",
+                    side=f.side,
+                    price=f.price,
+                )
             pos.apply(f, Purpose.ENTRY)
             if o.is_open:
                 # any fill stops further entry
@@ -294,7 +340,36 @@ class Engine:
             t.reason = "exchange_stop"
         self.trades.append(t)
         self.journal.trade(t, ts=t.close_time)
-        log.info("%s closed %s net=%.4f reason=%s", s, t.side, t.net, t.reason)
+        self.alert(
+            "trade_closed",
+            s,
+            f"closed {t.side} net {t.net:+.4f} USDT ({t.reason}, {t.hold_minutes:.1f}m)",
+            net=t.net,
+            reason=t.reason,
+            entry=t.entry_price,
+            exit=t.exit_price,
+        )
+        self._count(t.close_time, t.net)
+
+    def _count(self, ts: int, net: float, alert: bool = True):
+        """Update daily pnl and loss streak; pause new entries when a limit is hit."""
+        r = self.cfg.risk
+        if ts // DAY != self.day:
+            self.day, self.day_net = ts // DAY, 0.0
+        self.day_net += net
+        self.streak = self.streak + 1 if net < 0 else 0
+        until, why = 0, ""
+        if r.max_daily_loss and self.day_net <= -r.max_daily_loss:
+            until, why = (self.day + 1) * DAY, f"daily loss {self.day_net:.2f} USDT"
+        elif r.max_consecutive_losses and self.streak >= r.max_consecutive_losses:
+            until, why = ts + r.loss_pause_min * 60_000, f"{self.streak} losses in a row"
+            self.streak = 0
+        if until > self.paused_until:
+            self.paused_until, self.pause_reason = until, why
+            if alert:
+                self.alert(
+                    "loss_limit", None, f"new entries paused: {why}", "critical", until=until
+                )
 
     # ---- protection and exit
 
@@ -326,8 +401,10 @@ class Engine:
         self.journal.order(res)
         log.info("%s exchange stop %s %s @ %s -> %s", s, o.side, o.qty, stop_px, res.status)
         if res.status is OrderStatus.REJECTED:
-            log.error("%s stop rejected: %s", s, res.reason)
-            self.journal.event("stop_rejected", s, reason=res.reason)
+            # no exchange side protection: get out now
+            self.alert("stop_rejected", s, f"stop rejected ({res.reason}), closing", "critical")
+            if pos.state is PosState.POSITION_OPEN:
+                await self._exit(s, "stop_rejected", self.clock())
 
     async def cancel_entries(self):
         """On shutdown: pull resting entries, keep positions and their stops."""
@@ -372,7 +449,68 @@ class Engine:
         if res.status is OrderStatus.REJECTED and pos.has_qty:
             # retry on the next mark price
             pos.state = PosState.POSITION_OPEN
-            self.journal.event("exit_rejected", s, ts=ts, reason=res.reason)
+            self.alert("exit_rejected", s, f"exit rejected ({res.reason}), retrying", "warning")
+
+    async def _adopt(self, s: str, qty: float):
+        """Exchange position without a matching local record: manage it from now on."""
+        pos = self.positions[s]
+        mark = self.market[s].mark
+        quote = self.market[s].quote
+        px = (
+            await self.broker.entry_price(s)
+            or (mark.price if mark else 0)
+            or (quote.mid if quote else 0)
+        )
+        pos.reset()
+        pos.side = Side.BUY if qty > 0 else Side.SELL
+        pos.qty = pos.entry_qty = abs(qty)
+        pos.entry_price = px
+        pos.open_time = self.clock()
+        pos.state = PosState.POSITION_OPEN
+        pos.meta = {"adopted": True}
+        self.alert(
+            "position_adopted",
+            s,
+            f"took over exchange position {qty} @ {px}, stop and exits now apply",
+            "warning",
+            qty=qty,
+            price=px,
+        )
+
+    def snapshot(self) -> dict:
+        """Current state for status files and a WebUI."""
+        now = self.clock()
+        out = {}
+        for s, pos in self.positions.pos.items():
+            mark = self.market[s].mark
+            e, st = self.entry[s], self.stop[s]
+            out[s] = {
+                "state": pos.state,
+                "side": pos.side,
+                "qty": pos.qty,
+                "entry_price": pos.entry_price,
+                "mark": mark.price if mark else None,
+                "pnl_pct": pos.profit_pct(mark.price) if mark and pos.has_qty else None,
+                "peak_pct": pos.peak_pct,
+                "tier": pos.tier,
+                "trail_pct": pos.stop_pct,
+                "held_min": (now - pos.open_time) / 60_000 if pos.open_time else None,
+                "entry_order": e.price if e is not None and e.is_open else None,
+                "stop_order": st.stop_price if st is not None and st.is_open else None,
+                "blocked": s in self.blocked,
+            }
+        return {
+            "ts": now,
+            "strategy": self.strategy.id,
+            "halted": self.halted,
+            "paused_until": self.paused_until or None,
+            "pause_reason": self.pause_reason if now < self.paused_until else "",
+            "day_net": self.day_net,
+            "loss_streak": self.streak,
+            "trades": len(self.trades),
+            "net": sum(t.net for t in self.trades),
+            "symbols": out,
+        }
 
     def _log_position(self, s: str, now: int):
         pos = self.positions[s]

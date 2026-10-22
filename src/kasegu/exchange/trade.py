@@ -286,6 +286,10 @@ class LiveBroker(Broker):
         rows = await self._rest(self.api.position_information_v3, symbol=symbol)
         return sum(float(r["positionAmt"]) for r in rows if r["symbol"] == symbol)
 
+    async def entry_price(self, symbol: str) -> float:
+        rows = await self._rest(self.api.position_information_v3, symbol=symbol)
+        return next((float(r["entryPrice"]) for r in rows if float(r["positionAmt"])), 0.0)
+
     async def auto_cancel(self, symbol: str, seconds: int):
         """Exchange cancels open orders of the symbol if not refreshed in time; 0 disables."""
         await self._rest(
