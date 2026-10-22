@@ -91,6 +91,45 @@ uv run python -m kasegu --mode live --confirm-live
   建立停損前先關閉倒數；啟動時也會先清掉上次留下的倒數。check 的第 2 段會驗證這個流程，
   通過後再打開（預設關閉）。
 
+### 保護機制
+
+- 交易所停損單被拒時，立刻以 reduce-only 市價單平倉。
+- 啟動或重連時，若交易所有本地沒有紀錄的倉位，會接手管理：掛停損並套用出場規則。
+- `risk.max_daily_loss`（USDT／UTC 日）與 `risk.max_consecutive_losses` 觸發後暫停新進場，
+  既有倉位照常保護與出場；重啟後會從 journal 讀回當日已實現損益。
+
+## Docker 部署
+
+```bash
+cp configs/config.example.yaml configs/config.yaml   # 策略、幣種、風控、告警
+cp .env.example .env                                 # 模式、API key、Telegram
+docker compose up -d --build
+docker compose logs -f
+docker compose stop        # SIGTERM：撤掉進場單，保留倉位與停損
+```
+
+- 模式由 `.env` 決定：`KASEGU_MODE=paper|live`，live 還需要 `KASEGU_CONFIRM_LIVE=1`。
+- `./data` 掛載進容器，存放 journal、`status.json`、`events.jsonl` 與歷史資料快取。
+- `status.json` 每 5 秒更新一次，健康檢查超過 60 秒沒更新就標記為 unhealthy；
+  容器設定 `restart: unless-stopped`。
+- 回測：`docker compose run --rm kasegu --mode backtest --symbols WIFUSDT --each`
+
+## 告警與事件（可選）
+
+引擎把重要事件發佈到事件匯流排，各個輸出互不影響，也不會卡住交易：
+
+| 輸出 | 設定 | 用途 |
+|---|---|---|
+| `data/events.jsonl` | `alerts.events_path` | 所有事件，一行一個 JSON |
+| Telegram | `alerts.telegram: true` + `.env` 的 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 手機通知，`alerts.min_level` 過濾等級 |
+| Webhook | `alerts.webhook_url` | 每個事件 POST 一個 JSON，可接未來的 WebUI |
+| `data/status.json` | `status_path` | 目前倉位、掛單、當日損益、暫停狀態的快照 |
+
+事件格式：`{"source", "tag", "kind", "level", "message", "symbol", "ts", "data"}`。
+主要事件有 `started`、`stopped`、`entry_filled`、`trade_closed`、`tier`（只記 journal）、
+`stop_rejected`、`exit_rejected`、`position_adopted`、`position_resized`、`position_gone`、
+`loss_limit`、`disconnected`、`reconnected`。
+
 ## API Key
 
 透過環境變數載入，不寫入 Git（可複製 `.env.example` 為 `.env`）：
@@ -112,6 +151,8 @@ src/kasegu/
 ├── core/                    # engine, execution, position, risk, types
 ├── strategies/              # 可替換的進場距離模型
 ├── exits/                   # 共用追蹤離場
+├── events.py / notify.py    # 事件匯流排與告警輸出
+├── health.py                # 容器健康檢查
 ├── backtest/                # 歷史重播
 └── storage/                 # SQLite journal
 tests/

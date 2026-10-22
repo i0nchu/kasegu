@@ -46,6 +46,10 @@ risk:
   min_quote_qty: 0.0
   stale_after_s: 10
   cost_reserve_pct: 1.0
+  # circuit breakers on realized net pnl, 0 = off
+  max_daily_loss: 0          # USDT per UTC day, pauses new entries until the next day
+  max_consecutive_losses: 0  # pause new entries after this many losing trades in a row
+  loss_pause_min: 60
 
 fee:
   maker: 0.0002
@@ -77,4 +81,13 @@ backtest:
   cache_dir: data/history
   out_dir: data/backtests
 
+# optional alerts; secrets (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) come from .env
+alerts:
+  min_level: warning        # telegram: info | warning | critical
+  telegram: false
+  webhook_url: ""           # POST one JSON event per request, e.g. a WebUI
+  webhook_min_level: info
+  events_path: data/events.jsonl
+
 db_path: data/journal.db
+status_path: data/status.json  # refreshed every 5s, used by the docker health check
