@@ -80,8 +80,12 @@ class Engine:
     async def sync(self):
         """Reconcile local state with the exchange. Exchange state wins."""
         for s in self.cfg.symbols:
+            stops = []
             for o in await self.broker.open_orders(s):
-                if purpose_of(o.client_id) is Purpose.ENTRY:
+                p = purpose_of(o.client_id)
+                if p is Purpose.STOP:
+                    stops.append(o)
+                elif p is not None:
                     await self.exec.cancel(o)
             await self.drain()
             pos, qty = self.positions[s], await self.broker.position_qty(s)
@@ -90,15 +94,33 @@ class Engine:
                     self.journal.event("sync_reset", s, local=pos.to_dict())
                 pos.reset()
                 self.blocked.discard(s)
+                for o in stops:
+                    await self.exec.cancel(o)
             elif not pos.has_qty or pos.side.sign * qty < 0:
-                # position without local record: protect only, no new entries
+                # position without local record: keep its stops, no new entries
                 self.blocked.add(s)
                 self.journal.event("sync_unknown_position", s, qty=qty)
                 log.error("%s has exchange position %s without local state", s, qty)
             else:
                 pos.qty = abs(qty)
                 pos.state = PosState.POSITION_OPEN
+                # adopt a matching stop from before the restart, drop the rest
+                keep = next(
+                    (
+                        o
+                        for o in stops
+                        if abs(o.qty - pos.qty) < 1e-12 and o.side is pos.side.opposite
+                    ),
+                    None,
+                )
+                for o in stops:
+                    if o is not keep:
+                        await self.exec.cancel(o)
+                if keep is not None:
+                    self.exec.update(keep)
+                self.stop[s] = keep
                 await self._protect(s)
+            await self.drain()
             self._save(s)
 
     # ---- market events
