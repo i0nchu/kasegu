@@ -13,6 +13,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--mode", choices=["backtest", "paper", "live"], default="paper")
     p.add_argument("--config", default="configs/config.yaml")
     p.add_argument("--symbols", help="comma separated, overrides config symbols")
+    p.add_argument("--strategy", help="overrides strategy.id")
+    p.add_argument("--k", type=float, help="overrides strategy.k")
     p.add_argument(
         "--confirm-live",
         action="store_true",
@@ -51,6 +53,19 @@ def main(argv: list[str] | None = None) -> int:
     cfg.mode = args.mode
     if args.symbols:
         cfg.symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+    if args.strategy and args.strategy != cfg.strategy.id:
+        from kasegu.strategies import available
+
+        if args.strategy not in available():
+            log.error("unknown strategy %s (have %s)", args.strategy, available())
+            return 2
+        # params belong to the configured model, do not carry them over
+        cfg.strategy.id, cfg.strategy.params = args.strategy, {}
+    if args.k is not None:
+        if args.k <= 0:
+            log.error("--k must be > 0")
+            return 2
+        cfg.strategy.k = args.k
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
 
     if cfg.mode == "paper":
