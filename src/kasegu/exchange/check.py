@@ -41,7 +41,13 @@ async def check(cfg_path: str, symbol: str, wait_s: int) -> int:
     await broker.prepare([symbol], cfg.risk.leverage)
     await broker.connect()
     if await broker.position_qty(symbol):
-        log.error("%s has an open position on testnet, close it first", symbol)
+        # the test stop and countdown could touch a real position, use another symbol
+        log.error(
+            "%s has an open position; the check needs a flat symbol, e.g. --symbol BTCUSDT"
+            " (live mode itself takes over open positions)",
+            symbol,
+        )
+        await broker.close()
         return 2
 
     px = r.price_down(q.bid * 0.97)  # inside PERCENT_PRICE, far from the touch
