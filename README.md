@@ -27,6 +27,19 @@ uv run ruff check .
 ```bash
 uv run python -m kasegu --mode backtest --start 2026-10-01 --end 2026-10-07
 uv run python -m kasegu --mode backtest --symbols SOLUSDT   # 覆寫設定檔的 symbols
+uv run python -m kasegu --mode backtest --symbols SOLUSDT,WIFUSDT,SUIUSDT --each --label exp1
+```
+
+- `--each`：每個幣種各自跑一次，最後印出比較表（依 net 排序）。
+- `--label`：實驗名稱，會放在檔名與摘要最前面。
+- 報告檔名格式：`{label}_{幣種}_{起訖日}_{策略}-k{k}_{執行時間}.json`，
+  例如 `exp1_SOL_20261001-20261007_atr_amplitude-k3_20261022-171000.json`。
+
+比較已存在的報告（檔案或資料夾皆可，可輸出 CSV）：
+
+```bash
+uv run python -m kasegu.backtest.report data/backtests
+uv run python -m kasegu.backtest.report data/backtests/exp1_* --sort pf --csv exp1.csv
 ```
 
 回測、paper、live 共用同一套 Engine、Risk Manager 與 Exit Manager。

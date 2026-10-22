@@ -4,10 +4,11 @@ import logging
 import time
 import uuid
 from dataclasses import asdict
-from datetime import date
+from datetime import datetime
 
 from kasegu.backtest.data import Archive
 from kasegu.backtest.replay import Replay
+from kasegu.backtest.report import run_name
 from kasegu.config import AppConfig
 from kasegu.core.engine import Engine
 from kasegu.core.execution import PaperBroker
@@ -118,7 +119,7 @@ async def load_rules(cfg: AppConfig) -> dict[str, SymbolRules]:
     return {s: SymbolRules(**cached[s]) for s in cfg.symbols}
 
 
-async def run_backtest(cfg: AppConfig) -> dict:
+async def run_backtest(cfg: AppConfig, label: str = "") -> dict:
     bt = cfg.backtest
     if bt.start is None or bt.end is None or bt.end < bt.start:
         raise ValueError("backtest needs start <= end")
@@ -128,20 +129,26 @@ async def run_backtest(cfg: AppConfig) -> dict:
         cfg, rules, Archive(bt.cache_dir), bt.start, bt.end, funding_api=feed.funding_history
     )
     t0 = time.monotonic()
-    report = await replay.run()
+    result = await replay.run()
+    start, end = bt.start.isoformat(), bt.end.isoformat()
+    name = run_name(cfg.symbols, start, end, cfg.strategy.id, cfg.strategy.k, label)
+    out = bt.out_dir / f"{name}.json"
     report = {
+        "name": name,
+        "label": label,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "elapsed_s": round(time.monotonic() - t0, 1),
+        "source": "aggTrades",
         "strategy": cfg.strategy.model_dump(mode="json"),
         "symbols": cfg.symbols,
-        "start": bt.start.isoformat(),
-        "end": bt.end.isoformat(),
+        "start": start,
+        "end": end,
+        "file": str(out),
+        "result": result,
         "config": cfg.model_dump(mode="json"),
-        "result": report,
         "trades": [asdict(t) for t in replay.engine.trades],
     }
-    log.info("backtest done in %.0fs", time.monotonic() - t0)
     bt.out_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{date.today():%Y%m%d}-{cfg.strategy.id}-k{cfg.strategy.k}-{uuid.uuid4().hex[:6]}.json"
-    out = bt.out_dir / name
     out.write_text(json.dumps(report, indent=2, default=str))
-    log.info("report saved to %s", out)
+    log.info("backtest done in %.0fs, saved to %s", report["elapsed_s"], out)
     return report
