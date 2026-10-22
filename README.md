@@ -87,7 +87,9 @@ uv run python -m kasegu --mode live --confirm-live
   倉位與本地紀錄不符時停止該幣種的新進場。
 - 狀態存在 `data/journal-testnet.db` / `data/journal-mainnet.db`，與 paper 分開。
 - `live.auto_cancel_s`：交易所端倒數撤單，程式失聯時自動撤掉進場單。
-  需先用上面的 check 確認它不會撤掉停損單，預設關閉。
+  Testnet 實測它也會撤掉停損條件單，所以只在該幣種沒有倉位時啟用，
+  建立停損前先關閉倒數；啟動時也會先清掉上次留下的倒數。check 的第 2 段會驗證這個流程，
+  通過後再打開（預設關閉）。
 
 ## API Key
 

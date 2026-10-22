@@ -65,6 +65,7 @@ paper:
 # --mode live; exchange.testnet picks testnet or mainnet, market data follows it
 live:
   # exchange cancels open orders if not refreshed within this many seconds, 0 = off
+  # it also cancels stops, so it only runs while a symbol is flat
   # run `python -m kasegu.exchange.check` on testnet before turning it on
   auto_cancel_s: 0
   keepalive_min: 30
