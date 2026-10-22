@@ -1,0 +1,101 @@
+from pathlib import Path
+from typing import Any, Literal
+
+import yaml
+from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+Mode = Literal["backtest", "paper", "live"]
+
+
+class StrategyConfig(BaseModel):
+    id: str = "atr_amplitude"
+    k: float = Field(2.0, gt=0)
+    ema_period: int = 240
+    vol_period: int = 60
+    reference: Literal["ask", "mid"] = "ask"
+    params: dict[str, Any] = {}  # model specific parameters
+
+
+class ExitConfig(BaseModel):
+    # all values are unleveraged price return in %
+    stop_loss_pct: float = Field(1.0, gt=0)
+    low_threshold: float = 0.3
+    low_protect: float = 0.05
+    first_threshold: float = 0.6
+    trail_rate1: float = Field(0.4, ge=0, lt=1)
+    second_threshold: float = 1.2
+    trail_rate2: float = Field(0.25, ge=0, lt=1)
+    max_holding_minutes: int = Field(60, gt=0)
+
+    @model_validator(mode="after")
+    def _check_order(self):
+        if not self.low_threshold <= self.first_threshold <= self.second_threshold:
+            raise ValueError("tier thresholds must be ascending")
+        return self
+
+
+class RiskConfig(BaseModel):
+    margin_budget: float = Field(20.0, gt=0)  # USDT per trade
+    leverage: int = Field(5, ge=1)
+    max_leverage: int = 10
+    max_positions: int = Field(3, ge=1)
+    max_notional: float = 500.0  # total exposure in USDT
+    max_spread_pct: float = 0.05
+    min_quote_qty: float = 0.0  # min top-of-book qty in base asset
+    stale_after_s: float = 10.0
+    cost_reserve_pct: float = 1.0  # % of notional kept for fees/slippage
+
+    @model_validator(mode="after")
+    def _check_lev(self):
+        if self.leverage > self.max_leverage:
+            raise ValueError("leverage exceeds max_leverage")
+        return self
+
+
+class FeeConfig(BaseModel):
+    maker: float = 0.0002
+    taker: float = 0.0005
+    slippage_pct: float = 0.02
+    use_account_rate: bool = True
+
+
+class ExchangeConfig(BaseModel):
+    testnet: bool = True
+    history_bars: int = Field(1000, le=1500)
+    heartbeat_s: float = 30.0
+
+
+class PaperConfig(BaseModel):
+    balance: float = 1000.0
+
+
+class AppConfig(BaseModel):
+    mode: Mode = "paper"
+    symbols: list[str] = Field(min_length=1)
+    timeframe: Literal["1m"] = "1m"
+    strategy: StrategyConfig = StrategyConfig()
+    exit: ExitConfig = ExitConfig()
+    risk: RiskConfig = RiskConfig()
+    fee: FeeConfig = FeeConfig()
+    exchange: ExchangeConfig = ExchangeConfig()
+    paper: PaperConfig = PaperConfig()
+    db_path: Path = Path("data/journal.db")
+
+    @model_validator(mode="after")
+    def _upper(self):
+        self.symbols = [s.upper() for s in self.symbols]
+        return self
+
+
+class Secrets(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="BINANCE_", env_file=".env", extra="ignore")
+
+    api_key: SecretStr | None = None
+    api_secret: SecretStr | None = None
+
+
+def load_config(path: str | Path) -> AppConfig:
+    with open(path, encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    return AppConfig.model_validate(raw)
