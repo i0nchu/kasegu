@@ -330,3 +330,22 @@ async def test_algo_cancel_trusts_exchange_ack():
     b, _, seen = make(cancel_algo_order={"clientAlgoId": cid}, query_algo_order=algo)
     res = await b.cancel(S, cid)
     assert res.status is OrderStatus.CANCELED and seen[-1][0].status is OrderStatus.CANCELED
+
+
+def test_user_stream_url():
+    b, _, _ = make()
+    url = b.user_url("abc")
+    assert url == (
+        "wss://fstream.binancefuture.com/private/ws?listenKey=abc"
+        "&events=ORDER_TRADE_UPDATE/ALGO_UPDATE/ACCOUNT_UPDATE"
+    )
+
+
+def test_user_message_plain_or_wrapped():
+    o = entry()
+    b, _, seen = make()
+    ev = trade_ev(o, 0.1, 0.1, 100.1, "PARTIALLY_FILLED")
+    b._on_message({"stream": "x", "data": ev})
+    b._on_message(trade_ev(o, 0.3, 0.2, 100.1, "FILLED"))
+    b._on_message({"result": None, "id": 1})  # ack, ignored
+    assert [f.qty for _, f in seen if f] == pytest.approx([0.1, 0.2])

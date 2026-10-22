@@ -89,6 +89,10 @@ async def check(cfg_path: str, symbol: str, wait_s: int) -> int:
             ok = False
         else:
             print("[1] countdown cancels entries" + ("" if s.is_open else " and stops too"))
+        print(f"[1] user stream messages: {broker.received}")
+        if not broker.received:
+            print("[1] user stream got no events: fills would only be seen via REST")
+            ok = False
 
         s = await broker.place(stop2)
         await broker.arm(symbol, 5)

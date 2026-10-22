@@ -1,15 +1,14 @@
 import asyncio
+import json
 import logging
 import time
 from collections.abc import Callable
 from typing import Any
 
-from binance_common.configuration import ConfigurationRestAPI, ConfigurationWebSocketStreams
+import aiohttp
+from binance_common.configuration import ConfigurationRestAPI
 from binance_common.errors import BadRequestError
 from binance_sdk_derivatives_trading_usds_futures import DerivativesTradingUsdsFutures
-from binance_sdk_derivatives_trading_usds_futures.websocket_streams import (
-    DerivativesTradingUsdsFuturesWebSocketStreams,
-)
 
 from kasegu.config import ExchangeConfig, FeeConfig, Secrets
 from kasegu.core.execution import EPS, Broker, purpose_of
@@ -22,6 +21,7 @@ log = logging.getLogger(__name__)
 UNKNOWN_CODES = {-1000, -1001, -1006, -1007, -1021}
 MISSING_CODES = {-2011, -2013}  # unknown order
 POST_ONLY = -5022
+USER_EVENTS = ["ORDER_TRADE_UPDATE", "ALGO_UPDATE", "ACCOUNT_UPDATE"]
 
 _ALGO_STATUS = {
     "NEW": OrderStatus.NEW,
@@ -162,6 +162,9 @@ class LiveBroker(Broker):
         self.child: dict[int, str] = {}  # triggered child order id -> stop client id
         self.orphans: dict[int, list[dict]] = {}  # child updates seen before ALGO_UPDATE
         self.armed: set[str] = set()  # symbols with a running order countdown
+        self.session: aiohttp.ClientSession | None = None
+        self.reader: asyncio.Task | None = None
+        self.received = 0  # user stream messages, checked by the testnet check
 
     async def _rest(self, fn: Callable, *args, **kw) -> Any:
         resp = await asyncio.to_thread(fn, *args, **kw)
@@ -380,29 +383,44 @@ class LiveBroker(Broker):
             fee = _f(o.get("n"))
         self._apply(order, maker=bool(o.get("m")), last_px=last_px if exact else 0.0, fee=fee)
 
+    def user_url(self, listen_key: str) -> str:
+        # private endpoint needs the event list, a bare listenKey subscription gets nothing
+        base = self.ws_url.removesuffix("/stream").removesuffix("/ws")
+        return f"{base}/private/ws?listenKey={listen_key}&events={'/'.join(USER_EVENTS)}"
+
     async def connect(self):
         lk = (await self._rest(self.api.start_user_data_stream))["listenKey"]
-        ws = DerivativesTradingUsdsFuturesWebSocketStreams(
-            ConfigurationWebSocketStreams(stream_url=self.ws_url)
-        )
-        ws.url_paths = ["private"]
-        self.ws = await ws.create_connection()
-        if self.ws is None:
-            raise ConnectionError("user stream connect failed")
+        self.session = aiohttp.ClientSession(trust_env=True)
+        try:
+            self.ws = await self.session.ws_connect(self.user_url(lk), heartbeat=30)
+        except Exception:
+            await self.session.close()
+            raise
         self.closed = ""
-        for c in list(self.ws.connections):
-            self.ws.on_connection("close", lambda w=self.ws: self._on_close(w), connection=c)
-        (await self.ws.user_data(lk)).on("message", self._on_message)
+        self.reader = asyncio.create_task(self._read(self.ws))
+        log.info("user stream connected")
+
+    async def _read(self, ws):
+        async for msg in ws:
+            if msg.type is aiohttp.WSMsgType.TEXT:
+                self.received += 1
+                self._on_message(json.loads(msg.data))
+            elif msg.type is aiohttp.WSMsgType.ERROR:
+                break
+        if ws is self.ws and not self.closed:
+            self.closed = "user stream closed"
 
     def _on_message(self, msg):
         try:
-            self.on_user(plain(msg))
+            # combined stream format wraps the event in "data"
+            d = msg.get("data", msg) if isinstance(msg, dict) else msg
+            if not isinstance(d, dict) or "e" not in d:
+                log.info("user stream: %s", msg)
+                return
+            log.debug("user event %s", d)
+            self.on_user(d)
         except Exception:
             log.exception("user stream message failed")
-
-    def _on_close(self, ws):
-        if ws is self.ws and not self.closed:
-            self.closed = "user stream closed"
 
     async def keepalive(self):
         await self._rest(self.api.keepalive_user_data_stream)
@@ -411,12 +429,18 @@ class LiveBroker(Broker):
         return [self.closed] if self.closed else []
 
     async def close(self):
-        if self.ws is not None:
-            ws, self.ws = self.ws, None
+        ws, self.ws = self.ws, None
+        if ws is not None:
             try:
-                await ws.close_connection(close_session=True)
+                await ws.close()
             except Exception:
                 log.exception("close failed")
+        if self.reader is not None:
+            self.reader.cancel()
+            self.reader = None
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
 
 
 def _now() -> int:
