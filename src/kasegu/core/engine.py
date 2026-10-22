@@ -300,6 +300,12 @@ class Engine:
             log.error("%s stop rejected: %s", s, res.reason)
             self.journal.event("stop_rejected", s, reason=res.reason)
 
+    async def flatten(self, reason: str):
+        """Close every open position, e.g. at the end of a backtest."""
+        for s, pos in self.positions.pos.items():
+            if pos.has_qty and pos.state is PosState.POSITION_OPEN:
+                await self._exit(s, reason, self.clock())
+
     async def _cancel_protection(self, s: str):
         for book in (self.stop, self.close):
             o = book[s]
