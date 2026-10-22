@@ -61,7 +61,9 @@ class FeeConfig(BaseModel):
 
 
 class ExchangeConfig(BaseModel):
-    testnet: bool = True
+    testnet: bool = True  # order endpoints
+    data_testnet: bool = False  # market data endpoints
+    rest_timeout_ms: int = 10_000
     history_bars: int = Field(1000, le=1500)
     heartbeat_s: float = 30.0
 
