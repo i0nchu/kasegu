@@ -9,11 +9,12 @@ from datetime import datetime
 from kasegu.backtest.data import Archive
 from kasegu.backtest.replay import Replay
 from kasegu.backtest.report import run_name
-from kasegu.config import AppConfig
+from kasegu.config import AppConfig, Secrets
 from kasegu.core.engine import Engine
 from kasegu.core.execution import PaperBroker
 from kasegu.exchange.binance import BinanceMarket
 from kasegu.exchange.rules import SymbolRules
+from kasegu.exchange.trade import LiveBroker
 from kasegu.market.data import MINUTE, MarketData
 from kasegu.storage.journal import Journal
 from kasegu.strategies import create
@@ -61,7 +62,69 @@ async def run_paper(cfg: AppConfig):
     # paper positions do not survive a restart, sync resets local state
     eng.restore()
     await eng.sync()
+    try:
+        await serve(cfg, feed, eng, journal)
+    finally:
+        await feed.close()
+        journal.event("stop")
+        journal.close()
 
+
+async def run_live(cfg: AppConfig):
+    ex = cfg.exchange
+    venue = "testnet" if ex.testnet else "mainnet"
+    if ex.data_testnet != ex.testnet:
+        # strategy prices must come from the book the orders go to
+        log.info("live on %s: market data from %s too", venue, venue)
+        ex.data_testnet = ex.testnet
+    feed = BinanceMarket(ex)
+    broker = LiveBroker(ex, cfg.fee, Secrets())
+    rules = await feed.rules(cfg.symbols)
+    await broker.prepare(cfg.symbols, cfg.risk.leverage)
+    if cfg.fee.use_account_rate:
+        cfg.fee.maker, cfg.fee.taker = await broker.commission(cfg.symbols[0])
+    log.info("live on %s, fees maker=%s taker=%s", venue, cfg.fee.maker, cfg.fee.taker)
+
+    md = MarketData(cfg.symbols, maxlen=max(ex.history_bars, 1500))
+    await load_market(feed, cfg, md)
+
+    # own state db per venue so paper or testnet state never leaks into mainnet
+    db = cfg.db_path.with_name(f"{cfg.db_path.stem}-{venue}{cfg.db_path.suffix}")
+    journal = Journal(db, run_id=f"live-{venue}-{uuid.uuid4().hex[:8]}")
+    journal.event("start", mode="live", venue=venue, config=cfg.model_dump(mode="json"))
+    eng = Engine(cfg, create(cfg.strategy), broker, md, rules, journal, backfill=feed.klines_since)
+    eng.restore()
+    # stream first so no fill between sync and subscribe is missed
+    await broker.connect()
+    await eng.sync()
+    try:
+        await serve(cfg, feed, eng, journal, broker)
+    finally:
+        await feed.close()
+        await broker.close()
+        journal.event("stop")
+        journal.close()
+
+
+async def check_positions(eng: Engine, broker: LiveBroker):
+    """Exchange position wins: block a symbol whose local size disagrees."""
+    for s in eng.cfg.symbols:
+        pos, qty = eng.positions[s], await broker.position_qty(s)
+        local = pos.side.sign * pos.qty if pos.has_qty else 0.0
+        if abs(qty - local) > 1e-9:
+            eng.blocked.add(s)
+            eng.journal.event("position_mismatch", s, exchange=qty, local=local)
+            log.error("%s exchange position %s != local %s, entries blocked", s, qty, local)
+
+
+async def serve(
+    cfg: AppConfig,
+    feed: BinanceMarket,
+    eng: Engine,
+    journal: Journal,
+    broker: LiveBroker | None = None,
+):
+    """Main event loop shared by paper and live."""
     q: asyncio.Queue = asyncio.Queue()
 
     async def subscribe():
@@ -72,39 +135,64 @@ async def run_paper(cfg: AppConfig):
             on_mark=lambda m: q.put_nowait(("mark", m)),
         )
 
+    async def drain(_):
+        await eng.drain()
+
     await subscribe()
-    handlers = {"bar": eng.on_bar, "quote": eng.on_quote, "mark": eng.on_mark}
-    try:
-        while True:
+    handlers = {"bar": eng.on_bar, "quote": eng.on_quote, "mark": eng.on_mark, "drain": drain}
+    if broker is not None:
+        broker.wake = lambda: q.put_nowait(("drain", None))
+    live = cfg.live
+    due = {"keepalive": time.monotonic() + live.keepalive_min * 60, "countdown": 0.0}
+
+    while True:
+        try:
+            kind, ev = await asyncio.wait_for(q.get(), timeout=1.0)
+            if kind == "bar" and not ev.closed:
+                continue
+            await handlers[kind](ev)
+            if kind == "bar" and ev.symbol == cfg.symbols[-1]:
+                lag = feed.pop_lag()
+                if lag:
+                    worst = max(lag, key=lag.get)
+                    log.info("max stream delay %.2fs (%s)", lag[worst], worst)
+        except TimeoutError:
+            pass
+
+        now = time.monotonic()
+        if broker is not None:
             try:
-                kind, ev = await asyncio.wait_for(q.get(), timeout=1.0)
-                if kind == "bar" and not ev.closed:
-                    continue
-                await handlers[kind](ev)
-                if kind == "bar" and ev.symbol == cfg.symbols[-1]:
-                    lag = feed.pop_lag()
-                    if lag:
-                        worst = max(lag, key=lag.get)
-                        log.info("max stream delay %.2fs (%s)", lag[worst], worst)
-            except TimeoutError:
-                pass
-            bad = feed.stale()
-            if bad:
-                log.warning("stream stale (%s), reconnecting", ", ".join(bad))
-                eng.halted = True
-                journal.event("reconnect", reason=bad)
-                try:
-                    await feed.close()
-                    await subscribe()
-                    await resync(feed, eng)
-                    eng.halted = False
-                except Exception:
-                    log.exception("reconnect failed")
-                    await asyncio.sleep(5)
-    finally:
-        await feed.close()
-        journal.event("stop")
-        journal.close()
+                if now >= due["keepalive"]:
+                    await broker.keepalive()
+                    due["keepalive"] = now + live.keepalive_min * 60
+                if live.auto_cancel_s and now >= due["countdown"]:
+                    for s in cfg.symbols:
+                        await broker.auto_cancel(s, live.auto_cancel_s)
+                    due["countdown"] = now + live.auto_cancel_s / 3
+            except Exception:
+                log.exception("live timer failed")
+
+        bad = feed.stale() + (broker.stale() if broker else [])
+        if not bad:
+            continue
+        log.warning("stream stale (%s), reconnecting", ", ".join(bad))
+        eng.halted = True
+        journal.event("reconnect", reason=bad)
+        try:
+            await feed.close()
+            await subscribe()
+            if broker is not None:
+                await broker.close()
+                await broker.connect()
+            await resync(feed, eng)
+            if broker is not None:
+                await broker.reconcile([o for o in eng.exec.orders.values() if o.is_open])
+                await eng.drain()
+                await check_positions(eng, broker)
+            eng.halted = False
+        except Exception:
+            log.exception("reconnect failed")
+            await asyncio.sleep(5)
 
 
 async def load_rules(cfg: AppConfig) -> dict[str, SymbolRules]:

@@ -97,8 +97,18 @@ def main(argv: list[str] | None = None) -> int:
             print(table(rows))
         return 0
 
-    log.error("mode %s is not implemented yet", cfg.mode)
-    return 1
+    from kasegu.app import run_live
+
+    if not cfg.exchange.testnet:
+        log.warning("LIVE ON MAINNET: real orders with real funds")
+    try:
+        asyncio.run(run_live(cfg))
+    except KeyboardInterrupt:
+        pass
+    except (ValueError, RuntimeError) as e:
+        log.error("%s", e)
+        return 2
+    return 0
 
 
 if __name__ == "__main__":

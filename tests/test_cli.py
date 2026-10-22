@@ -35,3 +35,14 @@ def test_strategy_override(monkeypatch):
     except SystemExit:
         pass
     assert seen[0].id == "quantile" and seen[0].k == 1.2 and seen[0].params == {}
+
+
+def test_live_needs_keys(monkeypatch, tmp_path):
+    monkeypatch.delenv("BINANCE_API_KEY", raising=False)
+    monkeypatch.delenv("BINANCE_API_SECRET", raising=False)
+    monkeypatch.chdir(tmp_path)  # no .env here
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text(
+        open(__file__.replace("tests/test_cli.py", "configs/config.example.yaml")).read()
+    )
+    assert main(["--mode", "live", "--confirm-live", "--config", str(cfg)]) == 2
