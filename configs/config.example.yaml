@@ -62,6 +62,13 @@ exchange:
 paper:
   balance: 1000
 
+# --mode live; exchange.testnet picks testnet or mainnet, market data follows it
+live:
+  # exchange cancels open orders if not refreshed within this many seconds, 0 = off
+  # run `python -m kasegu.exchange.check` on testnet before turning it on
+  auto_cancel_s: 0
+  keepalive_min: 30
+
 # tick replay of data.binance.vision aggTrades, UTC days inclusive
 backtest:
   start: 2026-10-01
