@@ -100,6 +100,11 @@ async def run_live(cfg: AppConfig):
     try:
         await serve(cfg, feed, eng, journal, broker)
     finally:
+        try:
+            await asyncio.wait_for(eng.cancel_entries(), timeout=15)
+            log.info("entry orders cancelled, positions and stops are kept")
+        except BaseException:
+            log.exception("cancel entries on shutdown failed, check open orders")
         await feed.close()
         await broker.close()
         journal.event("stop")

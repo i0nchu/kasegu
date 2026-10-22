@@ -323,6 +323,15 @@ class Engine:
             log.error("%s stop rejected: %s", s, res.reason)
             self.journal.event("stop_rejected", s, reason=res.reason)
 
+    async def cancel_entries(self):
+        """On shutdown: pull resting entries, keep positions and their stops."""
+        for s in self.cfg.symbols:
+            o = self.entry[s]
+            if o is not None and o.is_open:
+                await self.exec.cancel(o)
+                self.journal.event("shutdown_cancel", s, client_id=o.client_id)
+            await self.drain()  # a fill seen while cancelling still gets its stop
+
     async def flatten(self, reason: str):
         """Close every open position, e.g. at the end of a backtest."""
         for s, pos in self.positions.pos.items():

@@ -181,3 +181,13 @@ async def test_sync_resets_unknown_local_position():
     )
     await eng.sync()
     assert pos.state is PosState.FLAT
+
+
+async def test_cancel_entries_on_shutdown():
+    eng, broker, clock = setup()
+    await next_bar(eng, clock, 108.0)
+    o = eng.entry[S]
+    assert o.is_open
+    await eng.cancel_entries()
+    assert eng.exec.get(o.client_id).status is OrderStatus.CANCELED
+    assert await broker.open_orders(S) == []
