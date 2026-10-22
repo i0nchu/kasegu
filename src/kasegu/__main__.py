@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -24,6 +25,10 @@ def main(argv: list[str] | None = None) -> int:
         level=args.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    if args.log_level.upper() != "DEBUG":
+        # the Binance SDK logs every frame on the root logger at INFO
+        for h in logging.getLogger().handlers:
+            h.addFilter(lambda r: r.name != "root" or r.levelno >= logging.WARNING)
     log = logging.getLogger("kasegu")
 
     if args.mode == "live" and not args.confirm_live:
@@ -33,6 +38,15 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(args.config)
     cfg.mode = args.mode
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
+
+    if cfg.mode == "paper":
+        from kasegu.app import run_paper
+
+        try:
+            asyncio.run(run_paper(cfg))
+        except KeyboardInterrupt:
+            pass
+        return 0
 
     log.error("mode %s is not implemented yet", cfg.mode)
     return 1
