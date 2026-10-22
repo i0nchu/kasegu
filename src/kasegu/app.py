@@ -131,7 +131,8 @@ async def run_backtest(cfg: AppConfig, label: str = "") -> dict:
     t0 = time.monotonic()
     result = await replay.run()
     start, end = bt.start.isoformat(), bt.end.isoformat()
-    name = run_name(cfg.symbols, start, end, cfg.strategy.id, cfg.strategy.k, label)
+    st = cfg.strategy
+    name = run_name(cfg.symbols, start, end, st.id, st.k, label, params=st.params)
     out = bt.out_dir / f"{name}.json"
     report = {
         "name": name,

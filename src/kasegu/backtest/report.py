@@ -20,6 +20,7 @@ def run_name(
     k: float,
     label: str = "",
     now: datetime | None = None,
+    params: dict | None = None,
 ) -> str:
     """File stem that says what was tested: label, symbols, period, model, time."""
     syms = "+".join(s.removesuffix("USDT") for s in symbols[:3])
@@ -27,7 +28,8 @@ def run_name(
         syms += f"+{len(symbols) - 3}more"
     period = f"{start.replace('-', '')}-{end.replace('-', '')}"
     stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
-    parts = [label, syms, period, f"{strategy}-k{k:g}", stamp]
+    model = "-".join([strategy, f"k{k:g}"] + [f"{a}{b}" for a, b in sorted((params or {}).items())])
+    parts = [label, syms, period, model, stamp]
     return re.sub(r"[^\w.+-]", "_", "_".join(p for p in parts if p))
 
 
@@ -47,7 +49,10 @@ def row(rep: dict) -> dict:
         "label": rep.get("label", ""),
         "symbols": ",".join(rep["symbols"]),
         "period": f"{rep['start']}~{rep['end']}",
-        "strategy": f"{st['id']} k={st['k']:g}",
+        "strategy": " ".join(
+            [st["id"], f"k={st['k']:g}"]
+            + [f"{a}={b}" for a, b in sorted(st.get("params", {}).items())]
+        ),
         "trades": r["trades"],
         "fill_rate": r["fill_rate"],
         "net": r["net"],

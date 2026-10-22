@@ -73,3 +73,14 @@ def test_backtest_each(tmp_path, monkeypatch, capsys):
     assert seen == [(["SOLUSDT"], "x"), (["WIFUSDT"], "x")]
     out = capsys.readouterr().out
     assert out.count("x | ") == 2 and "symbols" in out
+
+
+def test_params_in_name_and_row():
+    now = datetime(2026, 10, 22)
+    n = report.run_name(
+        ["SOLUSDT"], "2026-10-01", "2026-10-07", "quantile", 1.0, now=now, params={"q": 0.9}
+    )
+    assert "_quantile-k1-q0.9_" in n
+    r = rep("SOLUSDT", 1)
+    r["strategy"] = {"id": "quantile", "k": 1.0, "params": {"q": 0.9, "lookback": 720}}
+    assert report.row(r)["strategy"] == "quantile k=1 lookback=720 q=0.9"
