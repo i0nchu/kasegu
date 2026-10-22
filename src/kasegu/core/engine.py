@@ -144,6 +144,7 @@ class Engine:
         await self.drain()
         if status == "ok":
             await self.entry_cycle(k.symbol)
+            self._log_position(k.symbol, k.close_time)
 
     async def on_mark(self, m: MarkPrice):
         self.market.on_mark(m)
@@ -153,7 +154,11 @@ class Engine:
         s, pos = m.symbol, self.positions[m.symbol]
         if not pos.has_qty:
             return
+        tier = pos.tier
         reason = self.exits.update(pos, m.price, m.time)
+        if pos.tier != tier:
+            log.info("%s tier %d -> %d, trailing stop %+.3f%%", s, tier, pos.tier, pos.stop_pct)
+            self.journal.event("tier", s, ts=m.time, tier=pos.tier, stop_pct=pos.stop_pct)
         self._save(s, m.time)
         if reason and pos.state is PosState.POSITION_OPEN:
             await self._exit(s, reason, m.time)
@@ -319,6 +324,7 @@ class Engine:
         self.stop[s] = o
         res = await self.exec.submit(o)
         self.journal.order(res)
+        log.info("%s exchange stop %s %s @ %s -> %s", s, o.side, o.qty, stop_px, res.status)
         if res.status is OrderStatus.REJECTED:
             log.error("%s stop rejected: %s", s, res.reason)
             self.journal.event("stop_rejected", s, reason=res.reason)
@@ -348,6 +354,7 @@ class Engine:
     async def _exit(self, s: str, reason: str, ts: int):
         pos = self.positions[s]
         pos.state, pos.exit_reason = PosState.EXIT_PENDING, reason
+        log.info("%s exit %s (%s)", s, pos.qty, reason)
         o = Order(
             new_id(Purpose.EXIT),
             s,
@@ -366,6 +373,30 @@ class Engine:
             # retry on the next mark price
             pos.state = PosState.POSITION_OPEN
             self.journal.event("exit_rejected", s, ts=ts, reason=res.reason)
+
+    def _log_position(self, s: str, now: int):
+        pos = self.positions[s]
+        if not pos.has_qty:
+            return
+        mark = self.market[s].mark
+        p = pos.profit_pct(mark.price) if mark else 0.0
+        stop = f"{pos.stop_pct:+.3f}%" if pos.stop_pct is not None else "-"
+        held = (now - (pos.open_time or now)) / 60_000
+        log.info(
+            "%s %s %s %s @ %.8g mark %s pnl %+.3f%% H %+.3f%% tier %d trail %s sl -%s%% held %.1fm",
+            s,
+            pos.state,
+            pos.side,
+            pos.qty,
+            pos.entry_price,
+            mark.price if mark else "-",
+            p,
+            pos.peak_pct,
+            pos.tier,
+            stop,
+            self.cfg.exit.stop_loss_pct,
+            held,
+        )
 
     def _save(self, s: str, ts: int | None = None):
         self.journal.save_state(s, self.positions[s].to_dict(), ts=ts)
