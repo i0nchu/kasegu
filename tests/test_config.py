@@ -5,7 +5,7 @@ from kasegu.config import AppConfig, load_config
 
 
 def test_load_default_config():
-    cfg = load_config("configs/config.yaml")
+    cfg = load_config("configs/config.example.yaml")
     assert cfg.mode == "paper"
     assert cfg.strategy.id == "atr_amplitude"
     assert cfg.strategy.k == 3.0
