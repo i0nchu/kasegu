@@ -5,10 +5,12 @@ from kasegu.config import AppConfig, load_config
 
 
 def test_load_default_config():
-    cfg = load_config("configs/config.yaml")
+    cfg = load_config("configs/config.example.yaml")
     assert cfg.mode == "paper"
     assert cfg.strategy.id == "atr_amplitude"
-    assert cfg.strategy.k == 2.0
+    assert cfg.strategy.k == 3.0
+    assert cfg.exit.stop_loss_pct == 0.6
+    assert cfg.exit.max_holding_minutes == 30
     assert cfg.exchange.testnet
 
 

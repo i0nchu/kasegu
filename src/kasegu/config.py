@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -68,6 +69,13 @@ class ExchangeConfig(BaseModel):
     heartbeat_s: float = 30.0
 
 
+class BacktestConfig(BaseModel):
+    start: date | None = None  # inclusive, UTC days
+    end: date | None = None
+    cache_dir: Path = Path("data/history")
+    out_dir: Path = Path("data/backtests")
+
+
 class PaperConfig(BaseModel):
     balance: float = 1000.0
 
@@ -82,6 +90,7 @@ class AppConfig(BaseModel):
     fee: FeeConfig = FeeConfig()
     exchange: ExchangeConfig = ExchangeConfig()
     paper: PaperConfig = PaperConfig()
+    backtest: BacktestConfig = BacktestConfig()
     db_path: Path = Path("data/journal.db")
 
     @model_validator(mode="after")

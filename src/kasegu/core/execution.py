@@ -88,6 +88,7 @@ class PaperBroker(Broker):
         super().__init__()
         self.fees = fees
         self.orders: dict[str, Order] = {}
+        self.live: dict[str, dict[str, Order]] = {}  # symbol -> open orders
         self.pos: dict[str, float] = {}
         self.quotes: dict[str, Quote] = {}
         self.now = 0
@@ -98,6 +99,7 @@ class PaperBroker(Broker):
     async def place(self, o: Order) -> Order:
         o = self._copy(o)
         self.orders[o.client_id] = o
+        self.live.setdefault(o.symbol, {})[o.client_id] = o
         q = self.quotes.get(o.symbol)
         pos = self.pos.get(o.symbol, 0.0)
 
@@ -165,9 +167,10 @@ class PaperBroker(Broker):
             self._fill(o, qty, px, maker=False)
 
     def _open(self, symbol: str, kind: OrderType) -> list[Order]:
-        return [
-            o for o in self.orders.values() if o.symbol == symbol and o.type is kind and o.is_open
-        ]
+        book = self.live.get(symbol, {})
+        for cid in [c for c, o in book.items() if not o.is_open]:
+            del book[cid]
+        return [o for o in book.values() if o.type is kind]
 
     def _slip(self, side: Side, px: float) -> float:
         s = self.fees.slippage_pct / 100

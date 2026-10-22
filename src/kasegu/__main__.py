@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import logging
 import sys
+from datetime import date
+from pathlib import Path
 
 from kasegu.config import load_config
 
@@ -10,11 +12,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="kasegu")
     p.add_argument("--mode", choices=["backtest", "paper", "live"], default="paper")
     p.add_argument("--config", default="configs/config.yaml")
+    p.add_argument("--symbols", help="comma separated, overrides config symbols")
     p.add_argument(
         "--confirm-live",
         action="store_true",
         help="required together with --mode live",
     )
+    p.add_argument("--start", type=date.fromisoformat, help="backtest start (UTC day)")
+    p.add_argument("--end", type=date.fromisoformat, help="backtest end (UTC day)")
+    p.add_argument("--label", default="", help="backtest name prefix, e.g. exp1")
+    p.add_argument("--each", action="store_true", help="backtest each symbol separately")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args(argv)
 
@@ -35,8 +42,15 @@ def main(argv: list[str] | None = None) -> int:
         log.error("live mode must be enabled explicitly with --confirm-live")
         return 2
 
+    if not Path(args.config).exists():
+        log.error(
+            "%s not found, copy configs/config.example.yaml to %s first", args.config, args.config
+        )
+        return 2
     cfg = load_config(args.config)
     cfg.mode = args.mode
+    if args.symbols:
+        cfg.symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
 
     if cfg.mode == "paper":
@@ -46,6 +60,26 @@ def main(argv: list[str] | None = None) -> int:
             asyncio.run(run_paper(cfg))
         except KeyboardInterrupt:
             pass
+        return 0
+
+    if cfg.mode == "backtest":
+        from kasegu.app import run_backtest
+        from kasegu.backtest.report import row, summary, table
+
+        cfg.backtest.start = args.start or cfg.backtest.start
+        cfg.backtest.end = args.end or cfg.backtest.end
+        # --each runs every symbol on its own so results are comparable
+        groups = [[s] for s in cfg.symbols] if args.each else [cfg.symbols]
+        reports = []
+        for syms in groups:
+            run = cfg.model_copy(deep=True)
+            run.symbols = syms
+            rep = asyncio.run(run_backtest(run, args.label))
+            print("\n" + summary(rep) + "\n")
+            reports.append(rep)
+        if len(reports) > 1:
+            rows = sorted((row(r) for r in reports), key=lambda r: -r["net"])
+            print(table(rows))
         return 0
 
     log.error("mode %s is not implemented yet", cfg.mode)

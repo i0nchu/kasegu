@@ -19,3 +19,6 @@ dist/
 data/
 *.db
 .env
+
+# local config, copy from configs/config.example.yaml
+configs/config.yaml

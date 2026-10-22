@@ -176,6 +176,23 @@ class BinanceMarket:
         d = await self._rest(self.client.rest_api.user_commission_rate, symbol=symbol)
         return float(d["makerCommissionRate"]), float(d["takerCommissionRate"])
 
+    async def funding_history(self, symbol: str, start: int, end: int) -> list[tuple[int, float]]:
+        """(funding time ms, rate) between start and end, public endpoint."""
+        out: list[tuple[int, float]] = []
+        while start < end:
+            rows = await self._rest(
+                self.client.rest_api.get_funding_rate_history,
+                symbol=symbol,
+                start_time=start,
+                end_time=end,
+                limit=1000,
+            )
+            out += [(int(r["fundingTime"]), float(r["fundingRate"])) for r in rows]
+            if len(rows) < 1000:
+                break
+            start = out[-1][0] + 1
+        return out
+
     async def stream(
         self,
         symbols: list[str],
