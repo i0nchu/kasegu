@@ -11,6 +11,7 @@ Binance USDⓈ-M Futures 波動率交易系統（Strategy-Based Event-Driven Arc
 
 ```bash
 uv sync
+cp configs/config.example.yaml configs/config.yaml   # 本機設定，不進 git
 uv run python -m kasegu --mode paper      # 預設模式
 uv run python -m kasegu --mode backtest
 uv run python -m kasegu --mode live --confirm-live
@@ -25,6 +26,7 @@ uv run ruff check .
 
 ```bash
 uv run python -m kasegu --mode backtest --start 2026-10-01 --end 2026-10-07
+uv run python -m kasegu --mode backtest --symbols SOLUSDT   # 覆寫設定檔的 symbols
 ```
 
 回測、paper、live 共用同一套 Engine、Risk Manager 與 Exit Manager。
@@ -43,7 +45,7 @@ export BINANCE_API_SECRET=...
 ## 專案結構
 
 ```
-configs/config.yaml          # 實驗配置
+configs/config.example.yaml  # 範例配置，複製成 configs/config.yaml 使用
 src/kasegu/
 ├── __main__.py              # CLI 入口
 ├── config.py                # Pydantic 配置

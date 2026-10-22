@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 from datetime import date
+from pathlib import Path
 
 from kasegu.config import load_config
 
@@ -12,6 +13,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="kasegu")
     p.add_argument("--mode", choices=["backtest", "paper", "live"], default="paper")
     p.add_argument("--config", default="configs/config.yaml")
+    p.add_argument("--symbols", help="comma separated, overrides config symbols")
     p.add_argument(
         "--confirm-live",
         action="store_true",
@@ -39,8 +41,15 @@ def main(argv: list[str] | None = None) -> int:
         log.error("live mode must be enabled explicitly with --confirm-live")
         return 2
 
+    if not Path(args.config).exists():
+        log.error(
+            "%s not found, copy configs/config.example.yaml to %s first", args.config, args.config
+        )
+        return 2
     cfg = load_config(args.config)
     cfg.mode = args.mode
+    if args.symbols:
+        cfg.symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
 
     if cfg.mode == "paper":
