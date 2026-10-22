@@ -84,7 +84,10 @@ class FakeArchive:
             t = base + i * 1000
             yield t, round(self.price(t), 2), 0.1
 
+    funding_calls = 0
+
     def funding(self, symbol, start, end):
+        self.funding_calls += 1
         return []  # month not published yet, forces the REST fallback
 
 
@@ -102,8 +105,10 @@ async def test_replay_end_to_end():
         calls.append((sym, lo, hi))
         return [(ms(DAY) + h * 3_600_000, 0.0001) for h in range(0, 40, 8)]
 
-    rp = Replay(cfg, rules, FakeArchive(), DAY, DAY, funding_api=api)
+    arc = FakeArchive()
+    rp = Replay(cfg, rules, arc, DAY, DAY, funding_api=api)
     r = await rp.run()
+    assert arc.funding_calls == 1
     assert calls and calls[0][1] == ms(DAY)
     assert r["funding"] != 0
     assert r["open_positions"] == []

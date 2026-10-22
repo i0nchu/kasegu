@@ -113,7 +113,7 @@ class Replay:
             backfill=self.backfill,
             clock=lambda: self.now,
         )
-        self.funding = {s: Funding(archive.funding(s, start, end)) for s in cfg.symbols}
+        self.funding: dict[str, Funding] = {}
 
     async def load_funding(self):
         lo, hi = ms(self.start), ms(self.end + timedelta(1)) + 8 * 3_600_000
@@ -124,6 +124,7 @@ class Replay:
             if last < hi - 8 * 3_600_000 and self.funding_api is not None:
                 extra = await self.funding_api(s, max(last + 1, lo), hi)
                 rows += [r for r in extra if r[0] > last]
+                log.info("%s: %d funding rows from REST", s, len(extra))
             if not rows:
                 log.warning("%s: no funding data, funding is not simulated", s)
             self.funding[s] = Funding(rows)

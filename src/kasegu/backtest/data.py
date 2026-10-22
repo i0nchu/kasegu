@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import urllib.error
 import urllib.request
 import zipfile
 from collections.abc import Iterator
@@ -55,6 +56,12 @@ class Archive:
         try:
             with urllib.request.urlopen(url, timeout=60) as r:
                 data = r.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                log.info("not in archive (yet): %s", rel)
+            else:
+                log.warning("download failed %s: %s", url, e)
+            return None
         except Exception as e:
             log.warning("download failed %s: %s", url, e)
             return None
