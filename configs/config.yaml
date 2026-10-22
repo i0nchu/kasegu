@@ -9,29 +9,38 @@ timeframe: 1m
 
 strategy:
   id: atr_amplitude
-  k: 2.0
+  k: 3.0
   ema_period: 240
   vol_period: 60
   reference: ask
 
-# baseline exit config (placeholder values, to be validated by backtest)
+# original strategy exits, all values are unleveraged price return in %
 exit:
-  stop_loss_pct: 1.0
+  stop_loss_pct: 0.6
+
+  # tier 0
   low_threshold: 0.3
-  low_protect: 0.05
-  first_threshold: 0.6
-  trail_rate1: 0.4
-  second_threshold: 1.2
-  trail_rate2: 0.25
-  max_holding_minutes: 60
+  low_protect: 0.2
+
+  # tier 1
+  first_threshold: 0.8
+  trail_rate1: 0.35
+
+  # tier 2
+  second_threshold: 2.0
+  trail_rate2: 0.20
+
+  # experimental time stop, needs backtest validation
+  max_holding_minutes: 30
 
 risk:
-  margin_budget: 20
-  leverage: 5
+  margin_budget: 30
+  leverage: 10
   max_leverage: 10
-  max_positions: 3
-  max_notional: 500
+  max_positions: 1
+  max_notional: 350
   max_spread_pct: 0.05
+  min_quote_qty: 0.0
   stale_after_s: 10
   cost_reserve_pct: 1.0
 
@@ -39,7 +48,7 @@ fee:
   maker: 0.0002
   taker: 0.0005
   slippage_pct: 0.02
-  use_account_rate: true
+  use_account_rate: false
 
 exchange:
   testnet: true
