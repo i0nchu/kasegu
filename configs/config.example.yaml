@@ -7,12 +7,15 @@ symbols:
 
 timeframe: 1m
 
+# id: atr_amplitude | atr_only | quantile, k scales the entry distance
 strategy:
   id: atr_amplitude
   k: 3.0
   ema_period: 240
   vol_period: 60
   reference: ask
+  # quantile only: distance = quantile(next bar adverse move, q) over lookback bars * k
+  # params: {q: 0.95, lookback: 720}
 
 # original strategy exits, all values are unleveraged price return in %
 exit:

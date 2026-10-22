@@ -32,6 +32,7 @@ uv run python -m kasegu --mode backtest --symbols SOLUSDT,WIFUSDT,SUIUSDT --each
 
 - `--each`：每個幣種各自跑一次，最後印出比較表（依 net 排序）。
 - `--label`：實驗名稱，會放在檔名與摘要最前面。
+- `--strategy`、`--k`：不改設定檔直接換模型或倍率（換模型時不沿用設定檔的 `params`）。
 - 報告檔名格式：`{label}_{幣種}_{起訖日}_{策略}-k{k}_{執行時間}.json`，
   例如 `exp1_SOL_20261001-20261007_atr_amplitude-k3_20261022-171000.json`。
 
@@ -40,6 +41,26 @@ uv run python -m kasegu --mode backtest --symbols SOLUSDT,WIFUSDT,SUIUSDT --each
 ```bash
 uv run python -m kasegu.backtest.report data/backtests
 uv run python -m kasegu.backtest.report data/backtests/exp1_* --sort pf --csv exp1.csv
+```
+
+### 進場模型
+
+三個模型都用 EMA(240) 決定方向，只差在掛單距離 `Distance%`：
+
+| id | Distance% | k 的意義 |
+|---|---|---|
+| `atr_amplitude` | (ATR% + 平均振幅%) / 2 × k | 波動倍率（baseline） |
+| `atr_only` | ATR% × k | 波動倍率 |
+| `quantile` | 歷史「下一根 K 線逆向偏離」的 q 分位數 × k | 分位數的縮放，k=1 即原始分位數 |
+
+`quantile` 多單看下一根最低價跌破本根收盤的幅度、空單看下一根最高價突破的幅度，分開估計，
+只用決策當下已收盤的 K 線。參數放在 `strategy.params`：`q`（預設 0.95）、`lookback`（預設 720 根）。
+三者的 k 意義不同，比較時不要只看 k 數值相同。
+
+```bash
+uv run python -m kasegu --mode backtest --symbols WIFUSDT --strategy atr_only --k 3 --label m1
+uv run python -m kasegu --mode backtest --symbols WIFUSDT --strategy quantile --k 1 --label m1
+uv run python -m kasegu.backtest.report data/backtests/m1_*
 ```
 
 回測、paper、live 共用同一套 Engine、Risk Manager 與 Exit Manager。
