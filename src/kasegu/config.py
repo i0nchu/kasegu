@@ -46,6 +46,10 @@ class RiskConfig(BaseModel):
     min_quote_qty: float = 0.0  # min top-of-book qty in base asset
     stale_after_s: float = 10.0
     cost_reserve_pct: float = 1.0  # % of notional kept for fees/slippage
+    # circuit breakers on realized net pnl, 0 = off
+    max_daily_loss: float = Field(0.0, ge=0)  # USDT per UTC day, pauses until next day
+    max_consecutive_losses: int = Field(0, ge=0)
+    loss_pause_min: int = Field(60, gt=0)  # pause after the loss streak
 
     @model_validator(mode="after")
     def _check_lev(self):
@@ -84,6 +88,14 @@ class LiveConfig(BaseModel):
     keepalive_min: float = Field(30.0, gt=0)  # listen key keepalive
 
 
+class AlertConfig(BaseModel):
+    min_level: Literal["info", "warning", "critical"] = "warning"  # for telegram
+    telegram: bool = False  # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
+    webhook_url: str = ""  # POST one JSON event per request, e.g. a WebUI
+    webhook_min_level: Literal["info", "warning", "critical"] = "info"
+    events_path: Path | None = Path("data/events.jsonl")  # all events as JSON lines
+
+
 class PaperConfig(BaseModel):
     balance: float = 1000.0
 
@@ -99,8 +111,10 @@ class AppConfig(BaseModel):
     exchange: ExchangeConfig = ExchangeConfig()
     paper: PaperConfig = PaperConfig()
     live: LiveConfig = LiveConfig()
+    alerts: AlertConfig = AlertConfig()
     backtest: BacktestConfig = BacktestConfig()
     db_path: Path = Path("data/journal.db")
+    status_path: Path | None = Path("data/status.json")  # snapshot for health checks / WebUI
 
     @model_validator(mode="after")
     def _upper(self):
