@@ -166,8 +166,13 @@ async def serve(
                     await broker.keepalive()
                     due["keepalive"] = now + live.keepalive_min * 60
                 if live.auto_cancel_s and now >= due["countdown"]:
+                    # countdown would also cancel stops: only while flat
                     for s in cfg.symbols:
-                        await broker.auto_cancel(s, live.auto_cancel_s)
+                        stop = eng.stop[s]
+                        if eng.positions[s].has_qty or (stop is not None and stop.is_open):
+                            await broker.before_protect(s)
+                        else:
+                            await broker.arm(s, live.auto_cancel_s)
                     due["countdown"] = now + live.auto_cancel_s / 3
             except Exception:
                 log.exception("live timer failed")

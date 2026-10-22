@@ -161,6 +161,7 @@ class LiveBroker(Broker):
         self.filled: dict[str, float] = {}  # client id -> emitted filled qty
         self.child: dict[int, str] = {}  # triggered child order id -> stop client id
         self.orphans: dict[int, list[dict]] = {}  # child updates seen before ALGO_UPDATE
+        self.armed: set[str] = set()  # symbols with a running order countdown
 
     async def _rest(self, fn: Callable, *args, **kw) -> Any:
         resp = await asyncio.to_thread(fn, *args, **kw)
@@ -179,6 +180,8 @@ class LiveBroker(Broker):
             raise RuntimeError("account is in hedge mode, switch to one-way mode first")
         for s in symbols:
             await self._rest(self.api.change_initial_leverage, symbol=s, leverage=leverage)
+            # a countdown left by a previous run would cancel adopted stops
+            await self.auto_cancel(s, 0)
 
     async def commission(self, symbol: str) -> tuple[float, float]:
         d = await self._rest(self.api.user_commission_rate, symbol=symbol)
@@ -277,6 +280,22 @@ class LiveBroker(Broker):
         await self._rest(
             self.api.auto_cancel_all_open_orders, symbol=symbol, countdown_time=seconds * 1000
         )
+
+    async def arm(self, symbol: str, seconds: int):
+        """Start or refresh the countdown. It also cancels stops (checked on testnet),
+        so it may only run while the symbol has no position."""
+        await self.auto_cancel(symbol, seconds)
+        self.armed.add(symbol)
+
+    async def before_protect(self, symbol: str):
+        if symbol not in self.armed:
+            return
+        try:
+            await self.auto_cancel(symbol, 0)
+            self.armed.discard(symbol)
+        except Exception:
+            # stays armed, the live timer retries before the countdown runs out
+            log.exception("%s countdown disarm failed", symbol)
 
     async def reconcile(self, orders: list[Order]):
         """Query tracked open orders after a stream gap and emit missed fills."""

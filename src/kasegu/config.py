@@ -77,7 +77,8 @@ class BacktestConfig(BaseModel):
 
 
 class LiveConfig(BaseModel):
-    # exchange side countdown that cancels open orders if the bot stops refreshing it
+    # exchange side countdown that cancels open orders if the bot stops refreshing it;
+    # it also cancels stops, so it only runs while a symbol is flat
     # 0 = off; check with `python -m kasegu.exchange.check` before enabling
     auto_cancel_s: int = Field(0, ge=0)
     keepalive_min: float = Field(30.0, gt=0)  # listen key keepalive

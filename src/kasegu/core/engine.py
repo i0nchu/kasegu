@@ -296,6 +296,7 @@ class Engine:
     async def _protect(self, s: str):
         """(Re)place the exchange side stop for the full position."""
         pos = self.positions[s]
+        await self.broker.before_protect(s)
         old = self.stop[s]
         if old is not None and old.is_open:
             if abs(old.qty - pos.qty) < 1e-12:

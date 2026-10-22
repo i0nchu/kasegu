@@ -284,3 +284,33 @@ async def test_check_positions_blocks_mismatch():
 
     await check_positions(eng, B())
     assert S in eng.blocked
+
+
+async def test_countdown_disarmed_before_stop():
+    b, api, _ = make(auto_cancel_all_open_orders={})
+    await b.arm(S, 120)
+    await b.before_protect(S)
+    assert [kw["countdown_time"] for _, kw in api.calls] == [120_000, 0]
+    assert S not in b.armed
+    await b.before_protect(S)  # not armed: no call
+    assert len(api.calls) == 2
+
+    b, api, _ = make(auto_cancel_all_open_orders=RuntimeError("timeout"))
+    b.armed.add(S)
+    await b.before_protect(S)
+    assert S in b.armed  # retried by the live timer
+
+
+async def test_engine_disarms_before_stop():
+    eng, broker, clock = setup()
+    calls = []
+
+    async def hook(s):
+        calls.append((s, eng.stop[s]))
+
+    broker.before_protect = hook
+    pos = eng.positions[S]
+    pos.side, pos.qty, pos.entry_price, pos.state = Side.BUY, 0.5, 100.0, PosState.POSITION_OPEN
+    broker.pos[S] = 0.5
+    await eng.sync()
+    assert calls == [(S, None)] and eng.stop[S].is_open
