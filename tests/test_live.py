@@ -314,3 +314,19 @@ async def test_engine_disarms_before_stop():
     broker.pos[S] = 0.5
     await eng.sync()
     assert calls == [(S, None)] and eng.stop[S].is_open
+
+
+async def test_algo_cancel_trusts_exchange_ack():
+    cid = new_id(Purpose.STOP)
+    algo = {
+        "clientAlgoId": cid,
+        "symbol": S,
+        "side": "SELL",
+        "quantity": "0.3",
+        "triggerPrice": "99",
+        "reduceOnly": True,
+        "algoStatus": "NEW",
+    }
+    b, _, seen = make(cancel_algo_order={"clientAlgoId": cid}, query_algo_order=algo)
+    res = await b.cancel(S, cid)
+    assert res.status is OrderStatus.CANCELED and seen[-1][0].status is OrderStatus.CANCELED

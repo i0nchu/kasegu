@@ -233,9 +233,11 @@ class LiveBroker(Broker):
 
     async def cancel(self, symbol: str, client_id: str) -> Order | None:
         stop = purpose_of(client_id) is Purpose.STOP
+        accepted = False
         try:
             if stop:
                 await self._rest(self.api.cancel_algo_order, client_algo_id=client_id)
+                accepted = True
             else:
                 d = await self._rest(
                     self.api.cancel_order, symbol=symbol, orig_client_order_id=client_id
@@ -246,7 +248,12 @@ class LiveBroker(Broker):
                 raise
             log.info("cancel %s: %s %s", client_id, e.status_code, e.error_message)
         # already final or algo cancel: read the final state
-        return await self.query(symbol, client_id)
+        o = await self.query(symbol, client_id)
+        if accepted and o is not None and o.is_open:
+            # algo query can lag right after a successful cancel (seen on testnet)
+            o.status = OrderStatus.CANCELED
+            self.emit(o)
+        return o
 
     async def query(self, symbol: str, client_id: str) -> Order | None:
         p = purpose_of(client_id)
