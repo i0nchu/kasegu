@@ -75,3 +75,47 @@ def test_mid_reference():
     s = create(StrategyConfig(reference="mid"))
     st = make_state(np.linspace(100, 200, 1000), bid=199.0, ask=201.0)
     assert s.on_bar(st).metadata["ref"] == pytest.approx(200.0)
+
+
+def test_atr_only():
+    s = create(StrategyConfig(id="atr_only", k=1.5))
+    st = make_state(np.linspace(100, 200, 1000))
+    sig = s.on_bar(st)
+    exp = ind.atr(st.high, st.low, st.close, 60) / st.ask * 100 * 1.5
+    assert sig.side is Side.BUY
+    assert sig.metadata["distance_pct"] == pytest.approx(exp)
+
+
+def test_quantile_uses_side_specific_history():
+    from kasegu.strategies.quantile import next_bar_excursion
+
+    close = np.linspace(100, 200, 1000)
+    st = make_state(close)
+    # deep lower wicks only: longs see large drops, shorts only small rises
+    st.low[:] = close - 3
+    long = next_bar_excursion(st, Side.BUY, 50)
+    short = next_bar_excursion(st, Side.SELL, 50)
+    assert len(long) == 50 and long.min() > short.max()
+
+    s = create(StrategyConfig(id="quantile", k=1.0, params={"q": 0.5, "lookback": 50}))
+    sig = s.on_bar(st)
+    assert sig.side is Side.BUY
+    assert sig.metadata["distance_pct"] == pytest.approx(np.median(long))
+
+
+def test_quantile_ignores_current_bar():
+    from kasegu.strategies.quantile import next_bar_excursion
+
+    st = make_state(np.full(100, 100.0))
+    base = next_bar_excursion(st, Side.BUY, 20).copy()
+    st.low[-1] = 50  # last bar has no "next bar" yet, but its low is the next of bar -2
+    x = next_bar_excursion(st, Side.BUY, 20)
+    assert x[-1] > base[-1] and (x[:-1] == base[:-1]).all()
+    st.close[-1] = 10  # last close itself is never used
+    assert (next_bar_excursion(st, Side.BUY, 20) == x).all()
+
+
+def test_quantile_params():
+    assert create(StrategyConfig(id="quantile", params={"lookback": 900})).warmup == 901
+    with pytest.raises(ValueError):
+        create(StrategyConfig(id="quantile", params={"q": 1.5}))
