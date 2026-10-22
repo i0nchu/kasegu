@@ -164,6 +164,7 @@ class LiveBroker(Broker):
         self.armed: set[str] = set()  # symbols with a running order countdown
         self.session: aiohttp.ClientSession | None = None
         self.reader: asyncio.Task | None = None
+        self.requery: set[str] = set()  # fills waiting for a price
         self.received = 0  # user stream messages, checked by the testnet check
 
     async def _rest(self, fn: Callable, *args, **kw) -> Any:
@@ -333,13 +334,39 @@ class LiveBroker(Broker):
         f = None
         if o.filled_qty > prev + EPS:
             qty = o.filled_qty - prev
-            px = last_px or o.avg_price or o.stop_price or o.price or 0.0
-            if fee is None:
-                fee = qty * px * (self.fees.maker if maker else self.fees.taker)
-            f = Fill(o.client_id, o.symbol, o.side, qty, px, fee, maker, o.time or _now())
-            self.filled[o.client_id] = o.filled_qty
+            px = last_px or o.avg_price or o.stop_price or 0.0
+            if px <= 0:
+                # e.g. MARKET RESULT with avgPrice 0 on testnet: wait for the stream or a query
+                self._later(o)
+            else:
+                if fee is None:
+                    fee = qty * px * (self.fees.maker if maker else self.fees.taker)
+                f = Fill(o.client_id, o.symbol, o.side, qty, px, fee, maker, o.time or _now())
+                self.filled[o.client_id] = o.filled_qty
         self.emit(o, f)
         return o
+
+    def _later(self, o: Order):
+        if o.client_id in self.requery:
+            return
+        self.requery.add(o.client_id)
+
+        async def run():
+            try:
+                for i in range(5):
+                    await asyncio.sleep(1 + i)
+                    if self.filled.get(o.client_id, 0.0) >= o.filled_qty - EPS:
+                        return
+                    await self.query(o.symbol, o.client_id)
+                    if self.wake:
+                        self.wake()
+                log.error("%s fill price still unknown for %s", o.symbol, o.client_id)
+            except Exception:
+                log.exception("requery %s failed", o.client_id)
+            finally:
+                self.requery.discard(o.client_id)
+
+        asyncio.get_running_loop().create_task(run())
 
     # ---- user data stream
 

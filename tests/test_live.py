@@ -349,3 +349,15 @@ def test_user_message_plain_or_wrapped():
     b._on_message(trade_ev(o, 0.3, 0.2, 100.1, "FILLED"))
     b._on_message({"result": None, "id": 1})  # ack, ignored
     assert [f.qty for _, f in seen if f] == pytest.approx([0.1, 0.2])
+
+
+async def test_fill_without_price_waits_for_stream():
+    o = Order(
+        new_id(Purpose.EXIT), S, Side.BUY, OrderType.MARKET, 0.3, Purpose.EXIT, reduce_only=True
+    )
+    b, _, seen = make(new_order=lambda **kw: rest(o, "FILLED", 0.3, 0))
+    await b.place(o)
+    assert not any(f for _, f in seen) and o.client_id in b.requery
+    b.on_user(trade_ev(o, 0.3, 0.3, 100.2, "FILLED", fee="0.015"))
+    f = next(f for _, f in seen if f)
+    assert f.price == pytest.approx(100.2) and f.fee == pytest.approx(0.015)
