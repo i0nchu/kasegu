@@ -43,6 +43,7 @@ fee:
 
 exchange:
   testnet: true
+  data_testnet: false
   history_bars: 1000
   heartbeat_s: 30
 
