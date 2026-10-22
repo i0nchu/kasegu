@@ -1,7 +1,9 @@
 import argparse
 import asyncio
+import json
 import logging
 import sys
+from datetime import date
 
 from kasegu.config import load_config
 
@@ -15,6 +17,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="required together with --mode live",
     )
+    p.add_argument("--start", type=date.fromisoformat, help="backtest start (UTC day)")
+    p.add_argument("--end", type=date.fromisoformat, help="backtest end (UTC day)")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args(argv)
 
@@ -46,6 +50,17 @@ def main(argv: list[str] | None = None) -> int:
             asyncio.run(run_paper(cfg))
         except KeyboardInterrupt:
             pass
+        return 0
+
+    if cfg.mode == "backtest":
+        from kasegu.app import run_backtest
+
+        cfg.backtest.start = args.start or cfg.backtest.start
+        cfg.backtest.end = args.end or cfg.backtest.end
+        r = asyncio.run(run_backtest(cfg))["result"]
+        print(json.dumps({k: v for k, v in r.items() if k != "by_group"}, indent=2))
+        for g, v in r["by_group"].items():
+            print(f"{g:16} trades={v['trades']:4} net={v['net']:.4f} win={v['win_rate']}")
         return 0
 
     log.error("mode %s is not implemented yet", cfg.mode)

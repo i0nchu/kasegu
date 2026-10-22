@@ -50,4 +50,11 @@ exchange:
 paper:
   balance: 1000
 
+# tick replay of data.binance.vision aggTrades, UTC days inclusive
+backtest:
+  start: 2026-10-01
+  end: 2026-10-07
+  cache_dir: data/history
+  out_dir: data/backtests
+
 db_path: data/journal.db

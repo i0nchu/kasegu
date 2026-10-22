@@ -1,11 +1,18 @@
 import asyncio
+import json
 import logging
+import time
 import uuid
+from dataclasses import asdict
+from datetime import date
 
+from kasegu.backtest.data import Archive
+from kasegu.backtest.replay import Replay
 from kasegu.config import AppConfig
 from kasegu.core.engine import Engine
 from kasegu.core.execution import PaperBroker
 from kasegu.exchange.binance import BinanceMarket
+from kasegu.exchange.rules import SymbolRules
 from kasegu.market.data import MINUTE, MarketData
 from kasegu.storage.journal import Journal
 from kasegu.strategies import create
@@ -97,3 +104,44 @@ async def run_paper(cfg: AppConfig):
         await feed.close()
         journal.event("stop")
         journal.close()
+
+
+async def load_rules(cfg: AppConfig) -> dict[str, SymbolRules]:
+    """Exchange rules, cached so a backtest can be repeated offline."""
+    path = cfg.backtest.cache_dir / "rules.json"
+    cached = json.loads(path.read_text()) if path.exists() else {}
+    if not set(cfg.symbols) <= set(cached):
+        rules = await BinanceMarket(cfg.exchange).rules(cfg.symbols)
+        cached.update({s: asdict(r) for s, r in rules.items()})
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(cached, indent=2))
+    return {s: SymbolRules(**cached[s]) for s in cfg.symbols}
+
+
+async def run_backtest(cfg: AppConfig) -> dict:
+    bt = cfg.backtest
+    if bt.start is None or bt.end is None or bt.end < bt.start:
+        raise ValueError("backtest needs start <= end")
+    rules = await load_rules(cfg)
+    feed = BinanceMarket(cfg.exchange)
+    replay = Replay(
+        cfg, rules, Archive(bt.cache_dir), bt.start, bt.end, funding_api=feed.funding_history
+    )
+    t0 = time.monotonic()
+    report = await replay.run()
+    report = {
+        "strategy": cfg.strategy.model_dump(mode="json"),
+        "symbols": cfg.symbols,
+        "start": bt.start.isoformat(),
+        "end": bt.end.isoformat(),
+        "config": cfg.model_dump(mode="json"),
+        "result": report,
+        "trades": [asdict(t) for t in replay.engine.trades],
+    }
+    log.info("backtest done in %.0fs", time.monotonic() - t0)
+    bt.out_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{date.today():%Y%m%d}-{cfg.strategy.id}-k{cfg.strategy.k}-{uuid.uuid4().hex[:6]}.json"
+    out = bt.out_dir / name
+    out.write_text(json.dumps(report, indent=2, default=str))
+    log.info("report saved to %s", out)
+    return report

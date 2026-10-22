@@ -18,6 +18,17 @@ uv run pytest
 uv run ruff check .
 ```
 
+## 回測
+
+以 [data.binance.vision](https://data.binance.vision) 的 aggTrades 逐筆重播，1m K 線只用來預熱指標。
+資料會快取在 `data/history/`，報告輸出到 `data/backtests/`。
+
+```bash
+uv run python -m kasegu --mode backtest --start 2026-10-01 --end 2026-10-07
+```
+
+回測、paper、live 共用同一套 Engine、Risk Manager 與 Exit Manager。
+
 `live` 不會是預設模式，必須同時指定 `--mode live --confirm-live`。
 
 ## API Key
