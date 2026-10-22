@@ -1,10 +1,12 @@
 import asyncio
 import json
 import logging
+import signal
 import time
 import uuid
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 
 from kasegu.backtest.data import Archive
 from kasegu.backtest.replay import Replay
@@ -16,6 +18,7 @@ from kasegu.exchange.binance import BinanceMarket
 from kasegu.exchange.rules import SymbolRules
 from kasegu.exchange.trade import LiveBroker
 from kasegu.market.data import MINUTE, MarketData
+from kasegu.notify import build_bus
 from kasegu.storage.journal import Journal
 from kasegu.strategies import create
 
@@ -58,16 +61,31 @@ async def run_paper(cfg: AppConfig):
     broker = PaperBroker(cfg.fee)
     for s in cfg.symbols:
         broker.on_quote(md[s].quote)
-    eng = Engine(cfg, create(cfg.strategy), broker, md, rules, journal, backfill=feed.klines_since)
+    bus, http = build_bus(cfg.alerts, "paper")
+    bus.start()
+    eng = Engine(
+        cfg,
+        create(cfg.strategy),
+        broker,
+        md,
+        rules,
+        journal,
+        backfill=feed.klines_since,
+        events=bus,
+    )
     # paper positions do not survive a restart, sync resets local state
     eng.restore()
     await eng.sync()
+    eng.alert("started", None, f"paper {cfg.strategy.id} k={cfg.strategy.k} {cfg.symbols}")
     try:
-        await serve(cfg, feed, eng, journal)
+        await serve(cfg, feed, eng, journal, tag="paper")
     finally:
+        eng.alert("stopped", None, "paper stopped")
         await feed.close()
         journal.event("stop")
         journal.close()
+        await bus.close()
+        await http.close()
 
 
 async def run_live(cfg: AppConfig):
@@ -92,34 +110,62 @@ async def run_live(cfg: AppConfig):
     db = cfg.db_path.with_name(f"{cfg.db_path.stem}-{venue}{cfg.db_path.suffix}")
     journal = Journal(db, run_id=f"live-{venue}-{uuid.uuid4().hex[:8]}")
     journal.event("start", mode="live", venue=venue, config=cfg.model_dump(mode="json"))
-    eng = Engine(cfg, create(cfg.strategy), broker, md, rules, journal, backfill=feed.klines_since)
+    bus, http = build_bus(cfg.alerts, venue)
+    bus.start()
+    eng = Engine(
+        cfg,
+        create(cfg.strategy),
+        broker,
+        md,
+        rules,
+        journal,
+        backfill=feed.klines_since,
+        events=bus,
+    )
     eng.restore()
     # stream first so no fill between sync and subscribe is missed
     await broker.connect()
     await eng.sync()
+    eng.alert("started", None, f"live {venue} {cfg.strategy.id} k={cfg.strategy.k} {cfg.symbols}")
     try:
-        await serve(cfg, feed, eng, journal, broker)
+        await serve(cfg, feed, eng, journal, broker, tag=venue)
     finally:
         try:
             await asyncio.wait_for(eng.cancel_entries(), timeout=15)
-            log.info("entry orders cancelled, positions and stops are kept")
+            msg = "stopped, entry orders cancelled, positions and stops are kept"
+            open_ = [s for s, p in eng.positions.pos.items() if p.has_qty]
+            eng.alert("stopped", None, msg + (f" (open: {open_})" if open_ else ""), "warning")
         except BaseException:
             log.exception("cancel entries on shutdown failed, check open orders")
+            eng.alert("stopped", None, "stopped, cancelling entries FAILED", "critical")
         await feed.close()
         await broker.close()
         journal.event("stop")
         journal.close()
+        await bus.close()
+        await http.close()
 
 
-async def check_positions(eng: Engine, broker: LiveBroker):
-    """Exchange position wins: block a symbol whose local size disagrees."""
-    for s in eng.cfg.symbols:
-        pos, qty = eng.positions[s], await broker.position_qty(s)
-        local = pos.side.sign * pos.qty if pos.has_qty else 0.0
-        if abs(qty - local) > 1e-9:
-            eng.blocked.add(s)
-            eng.journal.event("position_mismatch", s, exchange=qty, local=local)
-            log.error("%s exchange position %s != local %s, entries blocked", s, qty, local)
+async def until_stopped(coro):
+    """Run coro; SIGTERM (docker stop) cancels it like Ctrl+C so cleanup runs."""
+    task = asyncio.current_task()
+    loop = asyncio.get_running_loop()
+    try:
+        loop.add_signal_handler(signal.SIGTERM, task.cancel)
+    except (NotImplementedError, RuntimeError):
+        pass  # not available on this platform
+    try:
+        await coro
+    except asyncio.CancelledError:
+        log.info("shutdown requested")
+
+
+def write_status(path: Path, data: dict):
+    # atomic so a reader never sees half a file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, default=str))
+    tmp.replace(path)
 
 
 async def serve(
@@ -128,6 +174,7 @@ async def serve(
     eng: Engine,
     journal: Journal,
     broker: LiveBroker | None = None,
+    tag: str = "",
 ):
     """Main event loop shared by paper and live."""
     q: asyncio.Queue = asyncio.Queue()
@@ -148,7 +195,8 @@ async def serve(
     if broker is not None:
         broker.wake = lambda: q.put_nowait(("drain", None))
     live = cfg.live
-    due = {"keepalive": time.monotonic() + live.keepalive_min * 60, "countdown": 0.0}
+    due = {"keepalive": time.monotonic() + live.keepalive_min * 60, "countdown": 0.0, "status": 0.0}
+    down_since = last_alert = 0.0  # monotonic time of the first failed reconnect
 
     while True:
         try:
@@ -165,6 +213,14 @@ async def serve(
             pass
 
         now = time.monotonic()
+        if cfg.status_path and now >= due["status"]:
+            try:
+                snap = eng.snapshot()
+                snap.update(mode=cfg.mode, venue=tag, streams_ok=not eng.halted)
+                write_status(cfg.status_path, snap)
+            except Exception:
+                log.exception("status write failed")
+            due["status"] = now + 5
         if broker is not None:
             try:
                 if now >= due["keepalive"]:
@@ -198,10 +254,25 @@ async def serve(
             if broker is not None:
                 await broker.reconcile([o for o in eng.exec.orders.values() if o.is_open])
                 await eng.drain()
-                await check_positions(eng, broker)
+                # exchange first: re-read positions and orders, alerts on any mismatch
+                await eng.sync()
             eng.halted = False
+            if down_since:
+                eng.alert("reconnected", None, f"streams back after {now - down_since:.0f}s")
+            down_since = 0.0
         except Exception:
             log.exception("reconnect failed")
+            if not down_since:
+                down_since = last_alert = now
+            elif now - last_alert > 60:
+                # repeat at most once a minute while down
+                eng.alert(
+                    "disconnected",
+                    None,
+                    f"streams down for {now - down_since:.0f}s, no new entries",
+                    "critical",
+                )
+                last_alert = now
             await asyncio.sleep(5)
 
 

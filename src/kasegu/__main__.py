@@ -1,30 +1,38 @@
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from datetime import date
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from kasegu.config import load_config
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    # env defaults make docker compose setup a matter of .env
+    env = os.environ.get
     p = argparse.ArgumentParser(prog="kasegu")
-    p.add_argument("--mode", choices=["backtest", "paper", "live"], default="paper")
-    p.add_argument("--config", default="configs/config.yaml")
+    p.add_argument(
+        "--mode", choices=["backtest", "paper", "live"], default=env("KASEGU_MODE", "paper")
+    )
+    p.add_argument("--config", default=env("KASEGU_CONFIG", "configs/config.yaml"))
     p.add_argument("--symbols", help="comma separated, overrides config symbols")
     p.add_argument("--strategy", help="overrides strategy.id")
     p.add_argument("--k", type=float, help="overrides strategy.k")
     p.add_argument(
         "--confirm-live",
         action="store_true",
-        help="required together with --mode live",
+        default=env("KASEGU_CONFIRM_LIVE") == "1",
+        help="required together with --mode live (or KASEGU_CONFIRM_LIVE=1)",
     )
     p.add_argument("--start", type=date.fromisoformat, help="backtest start (UTC day)")
     p.add_argument("--end", type=date.fromisoformat, help="backtest end (UTC day)")
     p.add_argument("--label", default="", help="backtest name prefix, e.g. exp1")
     p.add_argument("--each", action="store_true", help="backtest each symbol separately")
-    p.add_argument("--log-level", default="INFO")
+    p.add_argument("--log-level", default=env("KASEGU_LOG_LEVEL", "INFO"))
+    p.add_argument("--log-file", default=env("KASEGU_LOG_FILE"), help="rotating log file")
     return p.parse_args(argv)
 
 
@@ -34,6 +42,11 @@ def main(argv: list[str] | None = None) -> int:
         level=args.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    if args.log_file:
+        Path(args.log_file).parent.mkdir(parents=True, exist_ok=True)
+        fh = RotatingFileHandler(args.log_file, maxBytes=10_000_000, backupCount=5)
+        fh.setFormatter(logging.getLogger().handlers[0].formatter)
+        logging.getLogger().addHandler(fh)
     if args.log_level.upper() != "DEBUG":
         # the Binance SDK logs every frame on the root logger at INFO
         for h in logging.getLogger().handlers:
@@ -69,10 +82,10 @@ def main(argv: list[str] | None = None) -> int:
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
 
     if cfg.mode == "paper":
-        from kasegu.app import run_paper
+        from kasegu.app import run_paper, until_stopped
 
         try:
-            asyncio.run(run_paper(cfg))
+            asyncio.run(until_stopped(run_paper(cfg)))
         except KeyboardInterrupt:
             pass
         return 0
@@ -97,12 +110,12 @@ def main(argv: list[str] | None = None) -> int:
             print(table(rows))
         return 0
 
-    from kasegu.app import run_live
+    from kasegu.app import run_live, until_stopped
 
     if not cfg.exchange.testnet:
         log.warning("LIVE ON MAINNET: real orders with real funds")
     try:
-        asyncio.run(run_live(cfg))
+        asyncio.run(until_stopped(run_live(cfg)))
     except KeyboardInterrupt:
         pass
     except (ValueError, RuntimeError) as e:

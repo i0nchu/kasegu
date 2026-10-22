@@ -46,3 +46,13 @@ def test_live_needs_keys(monkeypatch, tmp_path):
         open(__file__.replace("tests/test_cli.py", "configs/config.example.yaml")).read()
     )
     assert main(["--mode", "live", "--confirm-live", "--config", str(cfg)]) == 2
+
+
+def test_env_defaults(monkeypatch):
+    monkeypatch.setenv("KASEGU_MODE", "live")
+    monkeypatch.setenv("KASEGU_CONFIRM_LIVE", "1")
+    monkeypatch.setenv("KASEGU_CONFIG", "/app/configs/config.yaml")
+    a = parse_args([])
+    assert a.mode == "live" and a.confirm_live and a.config == "/app/configs/config.yaml"
+    monkeypatch.setenv("KASEGU_CONFIRM_LIVE", "0")
+    assert not parse_args([]).confirm_live
