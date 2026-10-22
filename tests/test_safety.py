@@ -165,3 +165,16 @@ async def test_engine_publishes_alerts():
     eng.alert("stop_rejected", S, "boom", "critical", reason="x")
     await eng.events.close()
     assert got[0].kind == "stop_rejected" and got[0].data == {"reason": "x"}
+
+
+def test_health_check(tmp_path):
+    import time
+
+    from kasegu.health import main as health
+
+    p = tmp_path / "status.json"
+    assert health([str(p)]) == 1
+    write_status(p, {"ts": int(time.time() * 1000)})
+    assert health([str(p), "60"]) == 0
+    write_status(p, {"ts": int(time.time() * 1000) - 120_000})
+    assert health([str(p), "60"]) == 1
