@@ -17,4 +17,5 @@ dist/
 
 # Local data / secrets
 data/
+*.db
 .env

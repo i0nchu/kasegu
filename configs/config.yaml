@@ -1,0 +1,52 @@
+# live mode is never enabled from this file; use --mode live --confirm-live
+mode: paper
+
+symbols:
+  - BTCUSDT
+  - ETHUSDT
+
+timeframe: 1m
+
+strategy:
+  id: atr_amplitude
+  k: 2.0
+  ema_period: 240
+  vol_period: 60
+  reference: ask
+
+# baseline exit config (placeholder values, to be validated by backtest)
+exit:
+  stop_loss_pct: 1.0
+  low_threshold: 0.3
+  low_protect: 0.05
+  first_threshold: 0.6
+  trail_rate1: 0.4
+  second_threshold: 1.2
+  trail_rate2: 0.25
+  max_holding_minutes: 60
+
+risk:
+  margin_budget: 20
+  leverage: 5
+  max_leverage: 10
+  max_positions: 3
+  max_notional: 500
+  max_spread_pct: 0.05
+  stale_after_s: 10
+  cost_reserve_pct: 1.0
+
+fee:
+  maker: 0.0002
+  taker: 0.0005
+  slippage_pct: 0.02
+  use_account_rate: true
+
+exchange:
+  testnet: true
+  history_bars: 1000
+  heartbeat_s: 30
+
+paper:
+  balance: 1000
+
+db_path: data/journal.db
