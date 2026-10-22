@@ -67,6 +67,30 @@ uv run python -m kasegu.backtest.report data/backtests/m1_*
 
 `live` 不會是預設模式，必須同時指定 `--mode live --confirm-live`。
 
+## Live（Testnet）
+
+```bash
+# 1. 在 https://testnet.binancefuture.com 建立 API key，設定環境變數（見下方）
+# 2. 檢查下單、停損、user data stream 與自動撤單倒數
+uv run python -m kasegu.exchange.check --symbol BTCUSDT
+# 3. 啟動
+uv run python -m kasegu --mode live --confirm-live
+```
+
+- `exchange.testnet: true` 時下單與行情都走 Testnet（策略價格必須來自同一本委託簿）。
+  改成 `false` 才會連到正式環境，啟動時會再警告一次。
+- 帳戶必須是單向持倉（One-way Mode），啟動時會依 `risk.leverage` 設定各幣種槓桿。
+- 進場：Post-Only 限價單；出場：reduce-only 市價單；停損：交易所端 `STOP_MARKET`
+  條件單（Binance algo order，以標記價格觸發）。
+- 成交以 user data stream 為主，REST 回應與重連後的對帳只補上尚未記錄的成交量，不會重複計算。
+- 重啟時以交易所為準：撤掉舊進場單，沿用數量相符的停損單，多餘的停損單撤銷；
+  倉位與本地紀錄不符時停止該幣種的新進場。
+- 狀態存在 `data/journal-testnet.db` / `data/journal-mainnet.db`，與 paper 分開。
+- `live.auto_cancel_s`：交易所端倒數撤單，程式失聯時自動撤掉進場單。
+  Testnet 實測它也會撤掉停損條件單，所以只在該幣種沒有倉位時啟用，
+  建立停損前先關閉倒數；啟動時也會先清掉上次留下的倒數。check 的第 2 段會驗證這個流程，
+  通過後再打開（預設關閉）。
+
 ## API Key
 
 透過環境變數載入，不寫入 Git（可複製 `.env.example` 為 `.env`）：
@@ -83,7 +107,7 @@ configs/config.example.yaml  # 範例配置，複製成 configs/config.yaml 使�
 src/kasegu/
 ├── __main__.py              # CLI 入口
 ├── config.py                # Pydantic 配置
-├── exchange/                # Binance REST / WebSocket
+├── exchange/                # Binance REST / WebSocket、live broker、testnet check
 ├── market/                  # K 線、報價、標記價格
 ├── core/                    # engine, execution, position, risk, types
 ├── strategies/              # 可替換的進場距離模型

@@ -76,6 +76,14 @@ class BacktestConfig(BaseModel):
     out_dir: Path = Path("data/backtests")
 
 
+class LiveConfig(BaseModel):
+    # exchange side countdown that cancels open orders if the bot stops refreshing it;
+    # it also cancels stops, so it only runs while a symbol is flat
+    # 0 = off; check with `python -m kasegu.exchange.check` before enabling
+    auto_cancel_s: int = Field(0, ge=0)
+    keepalive_min: float = Field(30.0, gt=0)  # listen key keepalive
+
+
 class PaperConfig(BaseModel):
     balance: float = 1000.0
 
@@ -90,6 +98,7 @@ class AppConfig(BaseModel):
     fee: FeeConfig = FeeConfig()
     exchange: ExchangeConfig = ExchangeConfig()
     paper: PaperConfig = PaperConfig()
+    live: LiveConfig = LiveConfig()
     backtest: BacktestConfig = BacktestConfig()
     db_path: Path = Path("data/journal.db")
 

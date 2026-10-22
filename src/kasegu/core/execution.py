@@ -66,6 +66,9 @@ class Broker(ABC):
     async def position_qty(self, symbol: str) -> float:
         """Signed position size from the exchange."""
 
+    async def before_protect(self, symbol: str):  # noqa: B027
+        """Called before a stop is placed, e.g. to stop an order countdown."""
+
     # market hooks, used by simulated brokers
     def on_quote(self, q: Quote):  # noqa: B027
         pass
