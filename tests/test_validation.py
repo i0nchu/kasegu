@@ -1,9 +1,11 @@
 import json
+from datetime import date
 
 import pandas as pd
 import pytest
 
 from research.validation.analyze_shadow import analyze
+from research.validation.forward_holdout import days as forward_days
 from research.validation.maker import (
     AggTrade,
     BookGap,
@@ -18,6 +20,10 @@ from research.validation.portfolio import CapacityScenario, replay, stable_unifo
 
 def delta(first, final, previous, bids=(), asks=()):
     return DepthDelta("BTCUSDT", 1_000, first, final, previous, tuple(bids), tuple(asks))
+
+
+def test_forward_holdout_uses_only_completed_october_days():
+    assert forward_days() == [date(2026, 10, day) for day in range(1, 23)]
 
 
 def test_book_requires_snapshot_bridge_and_contiguous_updates():

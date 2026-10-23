@@ -1,0 +1,3 @@
+scenario,start,end,days,trades,avg_net_pct,net_usdt_independent_accounts,positive_symbols
+frozen,2026-10-01,2026-10-22,22,45,0.6705005091485651,89.61239304770574,16
+penetration_0.2_stop_slip_0.3,2026-10-01,2026-10-22,22,35,0.2149303276111545,22.34200755517951,14

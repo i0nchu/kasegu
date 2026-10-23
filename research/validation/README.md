@@ -16,6 +16,20 @@ PYTHONPATH=research .venv/bin/python -m validation.run_validation --reproduce
 The frozen alpha definition is `frozen_vda.json`. Validation may worsen execution and portfolio
 assumptions; it must not alter the strategy thresholds to recover profitability.
 
+## Run the untouched October 2026 holdout
+
+The prior research ends in September 2026. The checked-in result uses completed public daily files
+from 2026-10-01 through 2026-10-22 and keeps the alpha definition frozen. Fetching is an explicit,
+public-market-data-only step; normal reproduction is offline.
+
+```bash
+# One-time public data snapshot (no keys, account, or order endpoints)
+PYTHONPATH=research .venv/bin/python -m validation.forward_holdout --fetch
+
+# Offline replay of the downloaded snapshot
+PYTHONPATH=research .venv/bin/python -m validation.forward_holdout
+```
+
 ## Record future public shadow data
 
 This command records public market data only. It does not read API credentials. It is intentionally

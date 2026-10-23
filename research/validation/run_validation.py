@@ -46,6 +46,15 @@ def manifest() -> pd.DataFrame:
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             }
         )
+    for path in sorted((DATA / "forward").glob("**/*")):
+        if path.is_file() and path.suffix != ".part":
+            rows.append(
+                {
+                    "path": str(path.relative_to(DATA)),
+                    "bytes": path.stat().st_size,
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                }
+            )
     frame = pd.DataFrame(rows)
     frame.to_csv(OUT / "data_manifest.csv", index=False)
     return frame
@@ -102,8 +111,16 @@ def _fmt(x: float, n: int = 3) -> str:
     return f"{x:.{n}f}"
 
 
-def report(audit_result: dict, rec: dict, rep: dict, cap: pd.DataFrame, files: int) -> None:
+def report(
+    audit_result: dict,
+    rec: dict,
+    rep: dict,
+    cap: pd.DataFrame,
+    forward: pd.DataFrame,
+    files: int,
+) -> None:
     stress = pd.DataFrame(rep["scenarios"]).set_index("scenario")
+    forward = forward.set_index("scenario")
     exact = rep["exact"]
     cap_rows = "\n".join(
         "| "
@@ -129,6 +146,8 @@ def report(audit_result: dict, rec: dict, rep: dict, cap: pd.DataFrame, files: i
         for f in audit_result["findings"]
     )
     adverse = stress.loc["penetration_0.2_stop_slip_0.3"]
+    fwd = forward.loc["frozen"]
+    fwd_adverse = forward.loc["penetration_0.2_stop_slip_0.3"]
     verdict = "FAIL" if adverse.avg_net_pct <= 0 else "INCONCLUSIVE"
     text = f"""# Kasegu Independent Validation & Capacity Report
 
@@ -141,6 +160,7 @@ def report(audit_result: dict, rec: dict, rep: dict, cap: pd.DataFrame, files: i
 | --- | --- | --- |
 | 現行 baseline | **FAIL** | E1 每筆淨值 −0.115%，零成本價格期望仍為 −0.009%，沒有扣成本正期望。 |
 | VDA 訊號的一分鐘 OHLC 重現 | **PASS（限研究重現）** | {exact["matched_keys"]}/{exact["published_trades"]} 筆 key 對上；最大 net 差 {_fmt(exact["max_abs_net_diff_pct"], 12)}%。 |
+| 2026-10 未使用短期資料 | **PASS WITH LIMITS** | 22 個完整日、{int(fwd.trades)} 筆，凍結設定平均 {_fmt(fwd.avg_net_pct)}%；期間短且仍是 OHLC。 |
 | aggTrades 引擎一致性 | **PASS WITH LARGE ERROR** | 216 筆匹配，但引擎平均僅為分鐘模擬的 {rec["engine_to_sim_expectancy_ratio"]:.1%}；另有 {rec["sim_only"]} / {rec["engine_only"]} 筆單邊成交。 |
 | 真實 maker execution | **INCONCLUSIVE** | E4 沒有真實委託簿、排隊順位、撤單或部分成交；synthetic quote 不能證明 maker 成交。 |
 | Portfolio capacity | **INCONCLUSIVE** | 已施加共用資本限制，但歷史 book depth 不存在，規模、漏成交與衝擊只能做敏感度，不能估計真實容量。 |
@@ -170,6 +190,16 @@ def report(audit_result: dict, rec: dict, rep: dict, cap: pd.DataFrame, files: i
 策略組則必須穿過限價才成交。E1 想配相同筆數，最終仍是 46,052 vs 42,094。它不是 execution-matched control，
 因此「隨機組虧損」不能單獨證明策略 timing 的因果優勢。
 
+### E1–E5 逐實驗判讀
+
+| 實驗 | 可支持的結論 | 不能支持的結論／主要缺口 |
+| --- | --- | --- |
+| E1 baseline | 原始 baseline 在既有 OHLC 模型中穩健偏弱，連未扣成本價格期望也略負。 | 隨機對照不可重現且執行條件不同，不能作為 timing 因果證據。 |
+| E2 跨期搜尋 | `k=12` 在較早年度與新幣集合仍呈正值，值得形成候選假說。 | 是回看歷史、沒有 multiple-testing correction，且沒有 maker book 證據。 |
+| E3 鄰域／成本 | 相鄰參數仍有正值，並揭露結果對成交與停損滑價的敏感度。 | 穿價只是 proxy；L0 加 0.3% 停損／trail 滑價後由 +0.178% 變 −0.018%。 |
+| E4 aggTrades engine | 能量化分鐘模擬與逐筆重播的交易、價格及收益差異。 | 樣本由原模擬已成交 coin-days 篩出、排除 BTC/ETH、使用合成報價且逐幣獨立，不能推估全體 fill/capacity。 |
+| E5 capitulation filters | VDA 在既有資料可逐筆精確重現，條件後的歷史期望較高。 | 門檻由 Y1 選出並重用資料；E4 驗證的是 L0，不是 VDA，因此原報告的「real execution 仍獲利」表述過強。 |
+
 ## 2. Simulator levels and execution error
 
 1. `research/sim.py`：一分鐘 OHLC，對棒內路徑作固定 O-L-H-C / O-H-L-C 假設。
@@ -193,6 +223,19 @@ E4 還條件式抽取「原模擬已成交」的 coin-days、排除 BTC/ETH、�
 
 這些 adverse variants 只改 execution，沒有調整凍結 alpha 門檻。即使它們仍為正，也不能補上 queue 的未知資料；
 「價格穿過 0.2%」只是保守 proxy，不是排隊模型的校準值。
+
+### 2026-10 forward holdout
+
+先前研究資料止於 2026-09。本次另取當時未參與選模的 2026-10-01 至 2026-10-22 完整公開日檔，
+保留 2026-09 只作 rolling warm-up，並以同一份凍結設定、同一個模擬器執行。
+
+| 情境 | 完整日 | 交易數 | 每筆淨值 | 獨立帳戶合計 USDT | 正幣種 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| frozen | {int(fwd.days)} | {int(fwd.trades)} | {_fmt(fwd.avg_net_pct)}% | {_fmt(fwd.net_usdt_independent_accounts, 2)} | {int(fwd.positive_symbols)} |
+| 穿價 0.2% + 停損滑價 0.3% | {int(fwd_adverse.days)} | {int(fwd_adverse.trades)} | {_fmt(fwd_adverse.avg_net_pct)}% | {_fmt(fwd_adverse.net_usdt_independent_accounts, 2)} | {int(fwd_adverse.positive_symbols)} |
+
+這段資料對「急跌後條件反彈」提供新的支持證據，但只有 22 天、單一市場 regime，且仍缺少歷史 order book。
+它能降低純粹重用舊資料的疑慮，不能單獨證明 maker execution、容量或可持續性；最終判定維持 **INCONCLUSIVE / DO NOT PROMOTE**。
 
 ## 4. Shared portfolio and capacity sensitivity
 
@@ -226,6 +269,7 @@ queue multiplier、cancel timing 與 fill rule；在那之前不得寫成「真�
 快照位於 gitignored `data/validation/`，報告中的 manifest 能偵測變更但不能代替原始 Binance archive。
 
 ```bash
+PYTHONPATH=research .venv/bin/python -m validation.forward_holdout
 PYTHONPATH=research .venv/bin/python -m validation.run_validation --reproduce
 .venv/bin/python -m pytest tests/test_validation.py -q
 .venv/bin/python -m ruff check research/validation tests/test_validation.py
@@ -264,8 +308,12 @@ def main() -> None:
     else:
         raise SystemExit("Run once with --reproduce to create frozen-candidate evidence")
     _, cap = capacity()
+    forward_file = OUT / "forward_holdout_summary.csv"
+    if not forward_file.exists():
+        raise SystemExit("Run validation.forward_holdout before building the report")
+    forward = pd.read_csv(forward_file)
     files = len(manifest())
-    report(audit_result, rec, rep, cap, files)
+    report(audit_result, rec, rep, cap, forward, files)
 
 
 if __name__ == "__main__":
