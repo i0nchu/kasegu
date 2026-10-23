@@ -42,7 +42,7 @@ def expectancy(net: pd.Series) -> dict:
 
 def _one(args):
     symbol, cfg, folder, control, seed, n_ctrl = args
-    df, fund = bars(symbol)
+    df, fund = bars(symbol, cfg.extra.get("months"))
     if df.empty:
         return pd.DataFrame(), {}
     cfg = replace(cfg, tick=tick_of(symbol))

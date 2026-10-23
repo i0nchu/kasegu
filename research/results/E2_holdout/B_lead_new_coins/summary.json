@@ -1,0 +1,34 @@
+{
+ "group": "B_lead_new_coins",
+ "net_usdt": 129.33737744858317,
+ "avg_net_pct": 0.09285274740911835,
+ "avg_gross_pct": 0.16284427829026776,
+ "cost_pct": 0.0699915308811494,
+ "is_avg_net_pct": 0.1080692728028368,
+ "oos_avg_net_pct": 0.07392309859396622,
+ "pos_months": 18,
+ "months": 24,
+ "pos_coins": 8,
+ "coins": 12,
+ "exit_reasons": {
+  "trail_t0": 155,
+  "trail_t1": 120,
+  "max_hold": 94,
+  "stop_loss": 54,
+  "trail_t2": 46
+ },
+ "expectancy": {
+  "trades": 469,
+  "win_rate": 0.7974413646055437,
+  "avg_win_pct": 0.6224748106064196,
+  "avg_loss_pct": 1.992185690862362,
+  "payoff": 0.31245822789589833,
+  "breakeven_win_rate": 0.7619290113356034,
+  "expectancy_pct": 0.09285274740911842
+ },
+ "candidates": {
+  "expired": 6479482,
+  "rejected:in_position": 4264,
+  "filled": 469
+ }
+}

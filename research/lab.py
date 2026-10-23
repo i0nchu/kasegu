@@ -19,11 +19,13 @@ UNIVERSE = [
 ]  # fmt: skip
 
 
-def bars(symbol: str) -> tuple[pd.DataFrame, object]:
-    p = OUT / "bars" / f"{symbol}.pkl"
+def bars(symbol: str, months: list[str] | None = None) -> tuple[pd.DataFrame, object]:
+    months = months or MONTHS
+    tag = "" if months == MONTHS else f"_{months[0]}_{months[-1]}"
+    p = OUT / "bars" / f"{symbol}{tag}.pkl"
     if p.exists():
         return pickle.loads(p.read_bytes())
-    df, fund = load_klines(symbol, MONTHS), load_funding(symbol, MONTHS)
+    df, fund = load_klines(symbol, months), load_funding(symbol, months)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(pickle.dumps((df, fund)))
     return df, fund

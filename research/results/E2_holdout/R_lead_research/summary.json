@@ -1,0 +1,34 @@
+{
+ "group": "R_lead_research",
+ "net_usdt": 612.3740360398924,
+ "avg_net_pct": 0.184754967850516,
+ "avg_gross_pct": 0.2546134286867232,
+ "cost_pct": 0.06985846083620716,
+ "is_avg_net_pct": 0.19573738902763957,
+ "oos_avg_net_pct": 0.1730823390578246,
+ "pos_months": 12,
+ "months": 12,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 342,
+  "max_hold": 311,
+  "trail_t1": 269,
+  "trail_t2": 102,
+  "stop_loss": 92
+ },
+ "expectancy": {
+  "trades": 1116,
+  "win_rate": 0.7491039426523297,
+  "avg_win_pct": 0.6935703727962256,
+  "avg_loss_pct": 1.3344224554873887,
+  "payoff": 0.5197532235343745,
+  "breakeven_win_rate": 0.6580015653293868,
+  "expectancy_pct": 0.18475496785051582
+ },
+ "candidates": {
+  "expired": 7570566,
+  "rejected:in_position": 12517,
+  "filled": 1116
+ }
+}

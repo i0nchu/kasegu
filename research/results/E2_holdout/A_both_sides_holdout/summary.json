@@ -1,0 +1,34 @@
+{
+ "group": "A_both_sides_holdout",
+ "net_usdt": 19.327575093418723,
+ "avg_net_pct": 0.008063941811096816,
+ "avg_gross_pct": 0.0781016937350184,
+ "cost_pct": 0.07003775192392159,
+ "is_avg_net_pct": 0.008063941811096816,
+ "oos_avg_net_pct": NaN,
+ "pos_months": 7,
+ "months": 12,
+ "pos_coins": 17,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 260,
+  "max_hold": 228,
+  "trail_t1": 191,
+  "stop_loss": 74,
+  "trail_t2": 54
+ },
+ "expectancy": {
+  "trades": 807,
+  "win_rate": 0.7385377942998761,
+  "avg_win_pct": 0.5701094289593782,
+  "avg_loss_pct": 1.579514780181205,
+  "payoff": 0.36093959747180976,
+  "breakeven_win_rate": 0.7347864680090725,
+  "expectancy_pct": 0.008063941811096875
+ },
+ "candidates": {
+  "expired": 14685853,
+  "rejected:in_position": 9560,
+  "filled": 807
+ }
+}
