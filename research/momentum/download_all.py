@@ -65,7 +65,7 @@ def files_for(sym: str) -> list[str]:
 
 def main():
     syms = [p.rstrip("/").split("/")[-1] for p in listing("data/futures/um/monthly/klines/", True)]
-    syms = [s for s in syms if s.endswith("USDT")]
+    syms = [s for s in syms if s.endswith("USDT") and s.isascii() and s.isalnum()]
     print(len(syms), "USDT symbols")
     with cf.ThreadPoolExecutor(16) as ex:
         keys = [k for ks in ex.map(files_for, syms) for k in ks]

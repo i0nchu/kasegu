@@ -35,9 +35,10 @@ def atr(B, n=14):
     return pd.DataFrame(tr).rolling(n, min_periods=n).mean().to_numpy()
 
 
-def trade(rows, sym, t_in, side, px_in, px_out, fund):
+def trade(rows, sym, t_in, side, px_in, px_out, fund, **where):
     g = side * (px_out / px_in - 1)
-    rows.append({"sym": sym, "t": t_in, "side": side, "gross": g, "net": g - RT - side * fund})
+    rows.append({"sym": sym, "t": t_in, "side": side, "gross": g, "net": g - RT - side * fund,
+                 "px_in": px_in, "px_out": px_out, **where})  # fmt: skip
 
 
 # ---------------------------------------------------------------- volatility breakout (1h bars)
@@ -85,14 +86,14 @@ def sim_4h(B, entry_sig, exit_fn, sym, j, stop_atr):
     rows = []
     o, h, l, c, f = (B[k][:, j] for k in ("o", "h", "l", "c", "fund"))
     a = B["atr"][:, j]
-    pos, px, stop, best, fund, t_in = 0, 0.0, 0.0, 0.0, 0.0, 0
+    pos, px, stop, best, fund, t_in, i_in = 0, 0.0, 0.0, 0.0, 0.0, 0, 0
     for i in range(1, len(c)):
         if pos:
             fund += f[i]
             hit = (pos > 0 and l[i] <= stop) or (pos < 0 and h[i] >= stop)
             if hit:
                 out = min(stop, o[i]) if pos > 0 else max(stop, o[i])
-                trade(rows, sym, t_in, pos, px, out, fund)
+                trade(rows, sym, t_in, pos, px, out, fund, j=j, i_in=i_in, i_out=i)
                 pos = 0
             else:
                 best = max(best, c[i]) if pos > 0 else min(best, c[i])
@@ -100,12 +101,12 @@ def sim_4h(B, entry_sig, exit_fn, sym, j, stop_atr):
                 stop = max(stop, new_stop) if pos > 0 else min(stop, new_stop)
                 if exit_now(B, i, j, pos):
                     if i + 1 < len(c) and np.isfinite(o[i + 1]):
-                        trade(rows, sym, t_in, pos, px, o[i + 1], fund)
+                        trade(rows, sym, t_in, pos, px, o[i + 1], fund, j=j, i_in=i_in, i_out=i + 1)
                     pos = 0
                     continue
         if not pos and entry_sig[i] != 0 and i + 1 < len(c) and np.isfinite(o[i + 1]) and np.isfinite(a[i]):
             pos = int(entry_sig[i])
-            px, best, fund, t_in = o[i + 1], o[i + 1], 0.0, B["t"][i + 1]
+            px, best, fund, t_in, i_in = o[i + 1], o[i + 1], 0.0, B["t"][i + 1], i + 1
             stop = px - pos * stop_atr * a[i]
     return rows
 
