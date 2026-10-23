@@ -33,16 +33,25 @@ def test_tier_order():
         AppConfig(symbols=["BTCUSDT"], exit={"first_threshold": 2.0, "second_threshold": 1.0})
 
 
-def test_load_epr15_config():
+def test_load_epr15_configs():
     from kasegu.strategies import create
 
+    for path in ("configs/epr15.example.yaml", "configs/epr15.research.yaml"):
+        cfg = load_config(path)
+        assert cfg.mode == "paper" and cfg.exchange.testnet
+        assert cfg.strategy.id == "epr15" and cfg.exit.policy == "time_only"
+        create(cfg.strategy).check_exit(cfg.exit)
+
+    def notional(r):
+        return r.margin_budget * r.leverage * (1 - r.cost_reserve_pct / 100)
+
+    # research replication: same coins and size as the frozen run
+    res = load_config("configs/epr15.research.yaml")
+    assert len(res.symbols) == 40 and notional(res.risk) == pytest.approx(297)
+    # small account example: small size inside every cap
     cfg = load_config("configs/epr15.example.yaml")
-    assert cfg.mode == "paper" and cfg.exchange.testnet
-    assert cfg.strategy.id == "epr15" and cfg.exit.policy == "time_only"
-    assert len(cfg.symbols) == 40
-    create(cfg.strategy).check_exit(cfg.exit)
-    # same notional as the research, inside the loss budget
     r = cfg.risk
-    notional = r.margin_budget * r.leverage * (1 - r.cost_reserve_pct / 100)
-    assert notional == pytest.approx(297)
-    assert notional * cfg.exit.stop_loss_pct / 100 <= r.max_loss_per_trade
+    assert notional(r) < 50 and r.leverage <= r.max_leverage <= 3
+    assert notional(r) * cfg.exit.stop_loss_pct / 100 <= r.max_loss_per_trade
+    assert r.max_positions * notional(r) <= r.max_notional
+    assert r.max_daily_loss > 0 and r.max_consecutive_losses > 0

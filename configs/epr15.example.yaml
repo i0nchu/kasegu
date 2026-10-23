@@ -1,15 +1,12 @@
-# EPR15 (frozen at git tag alpha-epr15-v1), see docs/epr15.md
+# EPR15 (frozen at git tag alpha-epr15-v1) for shadow / testnet / small account validation.
+# Strategy and exit are frozen; only symbols and risk are yours to set. See docs/epr15.md.
+# The research replication (40 coins, 297 USDT per trade) is configs/epr15.research.yaml.
 # live mode is never enabled from this file; use --mode live --confirm-live
 mode: paper
 
-# the 40 research coins; trim for a small account, the rule itself is per coin
-symbols: [
-  BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT, DOGEUSDT, ADAUSDT, AVAXUSDT, LINKUSDT,
-  DOTUSDT, LTCUSDT, BCHUSDT, TRXUSDT, SUIUSDT, 1000PEPEUSDT, WIFUSDT, ARBUSDT, OPUSDT,
-  APTUSDT, NEARUSDT, TIAUSDT, INJUSDT, SEIUSDT, ENAUSDT, 1000BONKUSDT, FETUSDT, ORDIUSDT,
-  WLDUSDT, 1000FLOKIUSDT, AAVEUSDT, ATOMUSDT, CRVUSDT, ETCUSDT, FILUSDT, HBARUSDT, JUPUSDT,
-  ONDOUSDT, PENDLEUSDT, UNIUSDT, XLMUSDT,
-]
+# coins with a 5 USDT min notional; BTC (50), ETH / LTC / LINK / BCH / ETC (20) need more size.
+# Startup warns about any symbol the size below cannot trade.
+symbols: [SOLUSDT, DOGEUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, SUIUSDT]
 
 timeframe: 1m
 
@@ -26,29 +23,33 @@ exit:
   policy: time_only
   stop_loss_pct: 3.0
   max_holding_minutes: 15
-  # tier settings are ignored by time_only
 
 risk:
-  # 30 x 10 x 0.99 = 297 USDT notional per trade, as in the research
-  margin_budget: 30
-  leverage: 10
-  max_leverage: 10
-  max_positions: 3          # across all symbols; the research had no global cap
-  max_notional: 900         # total exposure incl. resting entries
-  max_loss_per_trade: 9     # USDT at the 3% stop; more leverage cannot get around it
+  # 10 x 2 x 0.99 = 19.8 USDT notional per trade. To trade less, lower margin_budget;
+  # never raise leverage to reach a min notional.
+  margin_budget: 10
+  leverage: 2
+  max_leverage: 3
+  # resting entries count as positions and as exposure: in a crash every resting buy can
+  # fill at once, so max_positions x notional is the real worst case (here 6 x 19.8)
+  max_positions: 6
+  max_notional: 120
+  # estimate at the 3% stop price only: gaps, mark price lag and slippage come on top
+  # (the engine replay saw stop fills down to -6.4%), see docs/epr15.md
+  max_loss_per_trade: 0.7
   max_spread_pct: 0.05
   min_quote_qty: 0.0
   stale_after_s: 10
   cost_reserve_pct: 1.0
-  max_daily_loss: 30        # USDT per UTC day, pauses new entries until the next day
-  max_consecutive_losses: 4
+  max_daily_loss: 3         # USDT per UTC day, pauses new entries until the next day
+  max_consecutive_losses: 3
   loss_pause_min: 120
 
 fee:
   maker: 0.0002
   taker: 0.0005
   slippage_pct: 0.02
-  use_account_rate: false
+  use_account_rate: false   # true in live to use the account rates
 
 exchange:
   testnet: true
@@ -57,10 +58,10 @@ exchange:
   heartbeat_s: 30
 
 paper:
-  balance: 1000
+  balance: 100
 
 live:
-  auto_cancel_s: 0
+  auto_cancel_s: 0          # see docs/epr15.md before turning on
   keepalive_min: 30
 
 backtest:

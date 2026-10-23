@@ -54,7 +54,7 @@ def has_trades(symbol: str, d: date) -> bool:
 
 
 def engine_cfg(symbol: str, d: date):
-    cfg = load_config("configs/epr15.example.yaml")
+    cfg = load_config("configs/epr15.research.yaml")
     cfg.mode, cfg.symbols = "backtest", [symbol]
     cfg.backtest.start = cfg.backtest.end = d
     r = cfg.risk
