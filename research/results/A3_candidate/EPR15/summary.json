@@ -1,0 +1,31 @@
+{
+ "group": "EPR15",
+ "net_usdt": 1378.8986362892074,
+ "avg_net_pct": 0.24206237492920296,
+ "avg_gross_pct": 0.31201595277003014,
+ "cost_pct": 0.06995357784082715,
+ "is_avg_net_pct": 0.28708288493072887,
+ "oos_avg_net_pct": 0.1710219465128166,
+ "pos_months": 22,
+ "months": 24,
+ "pos_coins": 26,
+ "coins": 40,
+ "exit_reasons": {
+  "max_hold": 1661,
+  "stop_loss": 257
+ },
+ "expectancy": {
+  "trades": 1918,
+  "win_rate": 0.5787278415015641,
+  "avg_win_pct": 1.3753216545843197,
+  "avg_loss_pct": 1.314766585983148,
+  "payoff": 1.0460576571132512,
+  "breakeven_win_rate": 0.48874478024772944,
+  "expectancy_pct": 0.2420623749292028
+ },
+ "candidates": {
+  "expired": 21389861,
+  "rejected:in_position": 23467,
+  "filled": 1918
+ }
+}

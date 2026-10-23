@@ -1,0 +1,27 @@
+{
+ "group": "hold5",
+ "net_usdt": 1032.294528575976,
+ "avg_net_pct": 0.1792542111116279,
+ "avg_gross_pct": 0.24928871622270474,
+ "cost_pct": 0.0700345051110768,
+ "is_avg_net_pct": 0.22073528484110208,
+ "oos_avg_net_pct": 0.11349288222583481,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 25,
+ "coins": 40,
+ "exit_reasons": {
+  "max_hold": 1707,
+  "stop_loss": 232
+ },
+ "expectancy": {
+  "trades": 1939,
+  "win_rate": 0.6008251676121712,
+  "avg_win_pct": 1.0872998944943961,
+  "avg_loss_pct": 1.187507056512306,
+  "payoff": 0.9156155228986873,
+  "breakeven_win_rate": 0.5220254210964064,
+  "expectancy_pct": 0.17925421111162787
+ },
+ "candidates": {}
+}

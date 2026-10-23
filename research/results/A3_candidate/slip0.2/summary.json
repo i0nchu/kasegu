@@ -1,0 +1,27 @@
+{
+ "group": "slip0.2",
+ "net_usdt": 145.0718857958458,
+ "avg_net_pct": 0.025467024396879097,
+ "avg_gross_pct": 0.09531225038651447,
+ "cost_pct": 0.06984522598963538,
+ "is_avg_net_pct": 0.06107127156210369,
+ "oos_avg_net_pct": -0.030714946264375816,
+ "pos_months": 12,
+ "months": 24,
+ "pos_coins": 16,
+ "coins": 40,
+ "exit_reasons": {
+  "max_hold": 1661,
+  "stop_loss": 257
+ },
+ "expectancy": {
+  "trades": 1918,
+  "win_rate": 0.4796663190823775,
+  "avg_win_pct": 1.4597761762640857,
+  "avg_loss_pct": 1.2967418129957362,
+  "payoff": 1.1257261558426246,
+  "breakeven_win_rate": 0.47042748062889883,
+  "expectancy_pct": 0.0254670243968792
+ },
+ "candidates": {}
+}
