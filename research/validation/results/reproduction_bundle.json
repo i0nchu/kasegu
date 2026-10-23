@@ -1,0 +1,46 @@
+{
+  "exact": {
+    "published_trades": 710,
+    "reproduced_trades": 710,
+    "matched_keys": 710,
+    "published_only": 0,
+    "reproduced_only": 0,
+    "max_abs_net_diff_pct": 4.440892098500626e-16,
+    "max_abs_entry_diff": 1.4551915228366852e-11,
+    "max_abs_exit_diff": 1.4551915228366852e-11
+  },
+  "scenarios": [
+    {
+      "scenario": "frozen",
+      "trades": 710,
+      "avg_net_pct": 0.414460075864078,
+      "net_usdt_independent_accounts": 873.9719619745812,
+      "positive_symbols": 24,
+      "positive_months": 21
+    },
+    {
+      "scenario": "penetration_0.2pct",
+      "trades": 528,
+      "avg_net_pct": 0.3051356318052112,
+      "net_usdt_independent_accounts": 478.50149237166,
+      "positive_symbols": 20,
+      "positive_months": 20
+    },
+    {
+      "scenario": "stop_slip_0.3pct",
+      "trades": 710,
+      "avg_net_pct": 0.15756957691759751,
+      "net_usdt_independent_accounts": 332.26696684613785,
+      "positive_symbols": 18,
+      "positive_months": 19
+    },
+    {
+      "scenario": "penetration_0.2_stop_slip_0.3",
+      "trades": 528,
+      "avg_net_pct": 0.04707773666316456,
+      "net_usdt_independent_accounts": 73.8254235257081,
+      "positive_symbols": 13,
+      "positive_months": 17
+    }
+  ]
+}

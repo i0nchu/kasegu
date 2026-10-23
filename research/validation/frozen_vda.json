@@ -1,0 +1,33 @@
+{
+  "candidate_id": "VDA-capitulation-v1",
+  "frozen_at_commit": "36552a3",
+  "source_group": "E5_capitulation/VDA",
+  "description": "Long-only extreme-dump fade with three pre-entry filters",
+  "universe": "research.lab.UNIVERSE (28 symbols)",
+  "period": ["2024-10", "2026-09"],
+  "strategy": {
+    "model": "atr_amplitude",
+    "k": 12,
+    "ema": 240,
+    "vol": 60,
+    "trend": "against",
+    "sides": "long",
+    "stop_loss_pct": 3.0,
+    "max_hold_minutes": 30,
+    "exit": "tiers"
+  },
+  "filters": {
+    "min_vol_ratio": 1.07,
+    "max_ret60_pct": -0.26,
+    "min_atr_pct": 0.081
+  },
+  "execution_assumptions": {
+    "entry": "one-minute OHLC trade-through approximation at resting limit",
+    "maker_fee_pct": 0.02,
+    "taker_fee_pct": 0.05,
+    "market_slippage_pct": 0.02,
+    "stop_extra_slippage_pct": 0.03,
+    "order_book_observed": false
+  },
+  "validation_rule": "No alpha parameter changes are allowed. Execution and portfolio assumptions may only be stressed adversely."
+}

@@ -1,0 +1,15 @@
+{
+  "simulator_level": "one-minute OHLC with assumed intrabar path",
+  "engine_level": "aggTrades with synthetic last-trade +/- half-tick quotes",
+  "real_order_book_observed": false,
+  "matched": 216,
+  "sim_only": 9,
+  "engine_only": 8,
+  "match_rate_union": 0.927038626609442,
+  "engine_total_net_usdt": 114.3649237717578,
+  "matched_sim_avg_pct": 0.36090746811428404,
+  "matched_engine_avg_pct": 0.15200384856041924,
+  "engine_to_sim_expectancy_ratio": 0.4211712474519538,
+  "matched_mean_error_pct": -0.20890361955386483,
+  "matched_abs_error_pct": 0.7932972117231232
+}
