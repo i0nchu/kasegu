@@ -195,7 +195,12 @@ async def serve(
     if broker is not None:
         broker.wake = lambda: q.put_nowait(("drain", None))
     live = cfg.live
-    due = {"keepalive": time.monotonic() + live.keepalive_min * 60, "countdown": 0.0, "status": 0.0}
+    due = {
+        "keepalive": time.monotonic() + live.keepalive_min * 60,
+        "countdown": 0.0,
+        "status": 0.0,
+        "reconcile": 0.0,
+    }
     down_since = last_alert = 0.0  # monotonic time of the first failed reconnect
 
     while True:
@@ -221,6 +226,15 @@ async def serve(
             except Exception:
                 log.exception("status write failed")
             due["status"] = now + 5
+        if eng.blocked and now >= due["reconcile"]:
+            # unknown order or stop state: re-read the exchange until it is clear
+            try:
+                await eng.sync()
+                if not eng.blocked:
+                    eng.alert("reconciled", None, "exchange state confirmed, entries resume")
+            except Exception:
+                log.exception("reconcile failed")
+            due["reconcile"] = now + 30
         if broker is not None:
             try:
                 if now >= due["keepalive"]:

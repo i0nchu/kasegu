@@ -44,6 +44,7 @@ class RiskConfig(BaseModel):
     max_leverage: int = 10
     max_positions: int = Field(3, ge=1)
     max_notional: float = 500.0  # total exposure in USDT
+    max_loss_per_trade: float = Field(0.0, ge=0)  # USDT lost at the fixed stop, 0 = off
     max_spread_pct: float = 0.05
     min_quote_qty: float = 0.0  # min top-of-book qty in base asset
     stale_after_s: float = 10.0

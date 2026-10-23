@@ -25,7 +25,7 @@ class ExitPolicy(ABC):
         return p
 
     def held_ms(self, pos: Position, now: int) -> int:
-        return now - (pos.open_time or now)
+        return 0 if pos.open_time is None else now - pos.open_time
 
     def timed_out(self, pos: Position, now: int) -> bool:
         return self.held_ms(pos, now) >= self.cfg.max_holding_minutes * 60_000
