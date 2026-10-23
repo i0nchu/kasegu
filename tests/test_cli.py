@@ -56,3 +56,10 @@ def test_env_defaults(monkeypatch):
     assert a.mode == "live" and a.confirm_live and a.config == "/app/configs/config.yaml"
     monkeypatch.setenv("KASEGU_CONFIRM_LIVE", "0")
     assert not parse_args([]).confirm_live
+
+
+def test_epr15_refuses_overrides():
+    base = ["--config", "configs/epr15.example.yaml", "--mode", "backtest"]
+    assert main(base + ["--k", "3"]) == 2
+    # another strategy cannot inherit the epr15 exit by accident, and back
+    assert main(["--config", "configs/config.example.yaml", "--strategy", "epr15"]) == 2

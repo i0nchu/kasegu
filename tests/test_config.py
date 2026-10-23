@@ -31,3 +31,18 @@ def test_leverage_limit():
 def test_tier_order():
     with pytest.raises(ValidationError):
         AppConfig(symbols=["BTCUSDT"], exit={"first_threshold": 2.0, "second_threshold": 1.0})
+
+
+def test_load_epr15_config():
+    from kasegu.strategies import create
+
+    cfg = load_config("configs/epr15.example.yaml")
+    assert cfg.mode == "paper" and cfg.exchange.testnet
+    assert cfg.strategy.id == "epr15" and cfg.exit.policy == "time_only"
+    assert len(cfg.symbols) == 40
+    create(cfg.strategy).check_exit(cfg.exit)
+    # same notional as the research, inside the loss budget
+    r = cfg.risk
+    notional = r.margin_budget * r.leverage * (1 - r.cost_reserve_pct / 100)
+    assert notional == pytest.approx(297)
+    assert notional * cfg.exit.stop_loss_pct / 100 <= r.max_loss_per_trade
