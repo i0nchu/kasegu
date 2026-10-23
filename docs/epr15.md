@@ -14,7 +14,8 @@
 | 比較 | `scripts/epr15_compare.py` | 研究交易與正式引擎 tick 回放逐筆比對 |
 
 Engine、Broker、RiskManager、PositionManager 沒有複製；backtest、paper、live 用同一個 `Epr15` 與 `TimeOnlyExit`。
-原本的 `atr_amplitude`、`atr_only`、`quantile` 與 `trailing` 出場不變，回歸測試照常通過。
+原本的 `atr_amplitude`、`atr_only`、`quantile` 與 `trailing` 出場不變，回歸測試照常通過；
+`configs/config.example.yaml`（atr_amplitude）在 SOLUSDT、DOGEUSDT 2026-10-06~07 回測，main 與本分支結果完全相同（5 筆、淨 −0.9469 USDT、2,808 張進場單）。
 
 ## 2. 凍結參數
 
