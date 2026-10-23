@@ -171,25 +171,34 @@ class Engine:
             )
         pos.qty = abs(qty)
         pos.state = PosState.POSITION_OPEN
-        # adopt a matching stop from before the restart, drop the rest
-        keep = next(
-            (o for o in stops if abs(o.qty - pos.qty) < 1e-12 and o.side is pos.side.opposite),
-            None,
-        )
+        # stops from before the restart: they are exchange truth, so confirmed
+        side = pos.side.opposite
         for o in stops:
-            if o is not keep and (await self.exec.cancel(o)).is_open:
+            self.exec.update(o)
+        wrong = [o for o in stops if o.side is not side]
+        right = sorted((o for o in stops if o.side is side), key=lambda o: -o.remaining)
+        keep = next((o for o in right if abs(o.remaining - pos.qty) < 1e-12), None)
+        # until a full size stop is confirmed the largest existing one stays as protection
+        self.stop[s] = keep or (right[0] if right else None)
+        for o in wrong:
+            # a reduce-only stop on the wrong side never protects, removing it loses nothing
+            if (await self.exec.cancel(o)).is_open:
                 bad = f"stop {o.client_id} not cancelled"
-        if keep is not None:
-            self.exec.update(keep)
-        self.stop[s] = keep
-        await self._protect(s)
+        await self._protect(s)  # places the new stop first, cancels self.stop[s] once confirmed
+        await self.drain()
+        if pos.has_qty and not self._protected(s):
+            # keep every existing stop, _protect already blocked and handled the risk
+            self._save(s)
+            return "no confirmed stop for the position"
+        for o in right:
+            if o.client_id == (self.stop[s].client_id if self.stop[s] else None):
+                continue
+            cur = self.exec.get(o.client_id) or o
+            if cur.is_open and (await self.exec.cancel(cur)).is_open:
+                bad = f"stop {o.client_id} not cancelled"
         await self.drain()
         self._save(s)
-        if bad:
-            return bad
-        if pos.has_qty and not self._protected(s):
-            return "no confirmed stop for the position"
-        return ""
+        return bad
 
     def _protected(self, s: str) -> bool:
         """A confirmed open stop covers the whole position."""
@@ -199,7 +208,7 @@ class Engine:
             and st.is_open
             and self.exec.confirmed(st)
             and st.side is pos.side.opposite
-            and st.qty >= pos.qty - 1e-12
+            and st.remaining >= pos.qty - 1e-12
         )
 
     # ---- market events
@@ -444,7 +453,7 @@ class Engine:
         if not pos.has_qty:
             return
         await self.broker.before_protect(s)
-        if self._protected(s) and abs(self.stop[s].qty - pos.qty) < 1e-12:
+        if self._protected(s) and abs(self.stop[s].remaining - pos.qty) < 1e-12:
             return
         old = self.stop[s]
         stop_px = self.exits.stop_price(pos)
