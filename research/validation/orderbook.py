@@ -146,9 +146,7 @@ class ShadowOrder:
             return
         eligible = (
             self.side == "buy" and trade.taker_side == "sell" and trade.price <= self.price
-        ) or (
-            self.side == "sell" and trade.taker_side == "buy" and trade.price >= self.price
-        )
+        ) or (self.side == "sell" and trade.taker_side == "buy" and trade.price >= self.price)
         if not eligible or self.queue_ahead is None:
             return
         volume = trade.qty

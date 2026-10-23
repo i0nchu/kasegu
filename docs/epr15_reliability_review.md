@@ -143,6 +143,7 @@ Revalidation must be run without weakening these assertions:
 uv run pytest tests/test_epr15_reliability.py -q
 uv run pytest -q
 uv run ruff check .
+uv run ruff format --check .
 ```
 
 Revalidated against `b5d0c14b5512efb73e475cff111ee4a320a25c90`, fetched from
@@ -190,3 +191,91 @@ coverage, ordering, exposure, or entry-blocking assertion was weakened.
 | Safe for Paper / Shadow? | **Yes, observation only** | No orders leave the process. The added workflow is suitable for collecting evidence, subject to every declared data gap. |
 | Safe for Testnet? | **No** | Fix R09 first, rerun the unchanged test, then validate real conditional-order and user-stream sequencing on Testnet. |
 | Safe for small real-money execution? | **No** | A process restart with journal/exchange quantity disagreement can temporarily remove the only exchange-side stop. |
+
+## Final integration revalidation at `c097ac1`
+
+The remote branches were fetched again before integration. The test branch merged
+`origin/feat/epr15-integration` at
+`c097ac12089ff4029026ca5912675002114659ef` without rebasing or force-pushing. The
+merge-under-test was `f4f333a17b6f768000082827d90802561030192a` before this report and
+mechanical Ruff formatting were committed. No conflict required changing or
+weakening an independent safety assertion.
+
+### R01–R09 result
+
+| ID | Latest result | Evidence |
+|---|---|---|
+| EPR15-R01 | **PASS** | A stop placement timeout never causes an unconfirmed replacement to displace the last confirmed stop. If partial coverage is insufficient, the reduce-only emergency close is submitted before protection is canceled. |
+| EPR15-R02 | **PASS** | Failed entry cancellation/query retains per-symbol and therefore global entry blocking. |
+| EPR15-R03 | **PASS** | An incomplete open-order snapshot cannot clear a previously unknown entry because the known client id is rechecked first. |
+| EPR15-R04 | **PASS** | A REST failure during reconciliation is contained and leaves `sync_unconfirmed` blocking in place. |
+| EPR15-R05 | **PASS** | Out-of-order cumulative cancel and incremental fill events converge to the exchange exposure with one full-sized stop. |
+| EPR15-R06 | **PASS** | Flat reconciliation clears the local stop reference; a same-sized new position receives a fresh stop id. |
+| EPR15-R07 | **PASS** | A pending entry left by a crash is canceled before entries can resume. |
+| EPR15-R08 | **PASS** | A protected position retains its original open time and executes an overdue time exit on the first post-restart mark. |
+| EPR15-R09 | **PASS** | With journal exposure at 40% and exchange exposure at 60%, the operation trace places and confirms the 60% stop before canceling the old 40% stop. No zero-coverage interval is introduced by operation order. |
+
+The independent R09 assertion was not changed. Claude's additional R09 tests were
+also inspected and executed. They verify multiple correct-side stops plus a
+wrong-side stop, replacement placement timeout, remaining quantity after a partial
+stop trigger, and restart protection cleanup. The implementation now compares stop
+`remaining` quantity to exchange exposure, keeps the largest valid existing stop
+until a complete replacement is confirmed, and only then removes redundant
+correct-side stops. A wrong-side reduce-only stop is not protection and can be
+removed before replacement without reducing coverage.
+
+### R09 before and after
+
+- Before (`b5d0c14`): trace was `cancel old 40% stop` followed by
+  `place new 60% stop`; a failed second call could leave zero exchange protection.
+- After (`c097ac1`): trace is `place and confirm new 60% stop` followed by
+  `cancel old 40% stop`. If placement is rejected or unknown, old correct-side stops
+  remain until the position is closed or reconciliation succeeds. A partially
+  triggered stop counts only its remaining quantity.
+
+### Test and static-analysis record
+
+- `uv run pytest tests/test_epr15_reliability.py -q`: **9 passed**.
+- `uv run pytest tests/test_faults.py -q`: **21 passed**.
+- `uv run pytest -q`: **158 passed**.
+- `uv run ruff check .`: **passed**.
+- Initial `uv run ruff format --check .`: found formatting-only differences in three
+  independent Shadow/report files. Ruff mechanically formatted only those files.
+- Final `uv run ruff format --check .`: **71 files already formatted**.
+- Shadow Order Book and Daily Report tests are included in the 158-test full run.
+
+`atr_amplitude`, `TrailingExit`, `Epr15`, `TimeOnlyExit`, `PaperBroker`, and the
+existing `LiveBroker` interface are covered by the passing full suite. The frozen
+EPR15 parameters and strategy implementation were not modified by this reliability
+branch. The integration merge changes production code only through the reviewed
+upstream R09 commits.
+
+The historical SOLUSDT/DOGEUSDT aggTrade archives needed to independently reproduce
+the documented 2026-10-01 through 2026-10-07 result are not installed in this
+worktree. Therefore the historical 5-trade / −0.9469 USDT / 2,808-entry replay is
+**not independently revalidated in this run**. Unit, integration, fault-injection,
+Shadow Order Book, and Daily Report tests are complete; historical replay remains a
+test limitation.
+
+### Remaining safety and rollout conditions
+
+No unresolved simulated P0 blocker was found after `c097ac1`. The following remain
+external validation requirements rather than passing evidence:
+
+- Binance Testnet has not exercised actual conditional-order acknowledgements,
+  user-stream duplication/order, partial fills, restart adoption, or stop/time-exit
+  races.
+- At least two weeks of Paper/Shadow evidence and conservative book-fill comparison
+  have not yet been collected.
+- Real time-exit slippage still lacks a journaled decision-time book/mark reference.
+- Mainnet stop slippage, mark-price trigger lag, exchange outages, and gap risk are
+  not established by deterministic simulation.
+
+## Final permission verdict at `c097ac1`
+
+| Level | Verdict | Reason |
+|---|---|---|
+| Safe to merge into `main`? | **Yes, after normal PR review and CI** | R01–R09 pass unchanged independent assertions, the full suite passes, and no new simulated blocker remains. This is a software-integration verdict, not live-trading approval. |
+| Safe for Paper / Shadow? | **Yes** | It submits no exchange orders and the collector/reporting workflow is tested. Continue to treat modeled fills as estimates. |
+| Safe to enter Binance Testnet? | **Yes, for validation only** | Deterministic safety gates pass. Testnet acceptance scenarios listed above are still mandatory and must use explicitly authorized test credentials/orders. |
+| Safe for Mainnet real money? | **No** | No Testnet campaign or two-week Shadow run has been completed, and real exchange latency/slippage/stream behavior remains unverified. |

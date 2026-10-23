@@ -152,10 +152,7 @@ def build_report(
         if reference:
             sign = 1 if fill["side"] == "BUY" else -1
             adverse_bps = (
-                (float(fill["price"]) - float(reference))
-                / float(reference)
-                * sign
-                * 10_000
+                (float(fill["price"]) - float(reference)) / float(reference) * sign * 10_000
             )
             slippage[purpose].append(adverse_bps)
 

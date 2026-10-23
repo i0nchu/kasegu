@@ -21,9 +21,7 @@ def test_daily_report_joins_journal_status_and_conservative_estimates(tmp_path):
     journal.event("signal", "BTCUSDT", ts=start + 1, ok=True, reason="ok", price=99.0)
     journal.event("signal", "ETHUSDT", ts=start + 2, ok=False, reason="stale_data")
     journal.event("reconnect", ts=start + 3, reason=["market"])
-    journal.event(
-        "order_unknown", "BTCUSDT", ts=start + 4, level="critical", message="blocked"
-    )
+    journal.event("order_unknown", "BTCUSDT", ts=start + 4, level="critical", message="blocked")
 
     entry = Order(
         "vtn-report",
@@ -111,9 +109,7 @@ def test_daily_report_joins_journal_status_and_conservative_estimates(tmp_path):
     }
     assert report["orders"]["rejected_or_expired"] == 1
     assert report["paper_fills"]["first_fill_latency_ms"]["entry"]["avg"] == 250
-    assert report["paper_fills"]["adverse_slippage_bps"]["entry"]["avg"] == pytest.approx(
-        1.010101
-    )
+    assert report["paper_fills"]["adverse_slippage_bps"]["entry"]["avg"] == pytest.approx(1.010101)
     assert report["conservative_fill_estimates"]["filled_qty"] == 0.25
     assert report["positions"]["duration_minutes"]["avg"] == 15
     assert report["pnl"] == {"realized": pytest.approx(0.96), "unrealized_snapshot": 3.0}
