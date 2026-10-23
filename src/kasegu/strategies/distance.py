@@ -37,6 +37,9 @@ class DistanceStrategy(Strategy):
         if self.cfg.params.get("direction") == "against":
             # research: fade moves in the trend direction instead of against it
             side = side.opposite
+        sides = self.cfg.params.get("sides", "both")
+        if (sides == "long" and side is Side.SELL) or (sides == "short" and side is Side.BUY):
+            return None
 
         ref = self.reference(s)
         res = self.distance_pct(s, side, ref)

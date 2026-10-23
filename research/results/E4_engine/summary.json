@@ -1,0 +1,22 @@
+{
+ "coin_days": 200,
+ "sim_trades": 225,
+ "engine_trades": 224,
+ "matched": 216,
+ "sim_only": 9,
+ "engine_only": 8,
+ "sim_net_usdt_all": 236.37171654404457,
+ "engine_net_usdt_all": 114.3649237717578,
+ "matched_sim_avg%": 0.36090746811428404,
+ "matched_engine_avg%": 0.15200384856041924,
+ "engine_avg%_all": 0.17261948918641298,
+ "same_exit_reason": 0.875,
+ "stop_exit_engine_avg%": -3.4837681672861343,
+ "engine_win_rate": 0.6383928571428571,
+ "engine_candidate_outcomes": {
+  "expired": 165170,
+  "rejected:stale_data": 9954,
+  "rejected:spread": 447,
+  "filled": 224
+ }
+}

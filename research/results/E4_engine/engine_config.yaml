@@ -1,0 +1,80 @@
+# live mode is never enabled from this file; use --mode live --confirm-live
+mode: paper
+
+symbols:
+  - DOGEUSDT
+
+timeframe: 1m
+
+live: {auto_cancel_s: 120}
+
+# id: atr_amplitude | atr_only | quantile, k scales the entry distance
+strategy:
+  id: atr_amplitude
+  k: 12
+  ema_period: 240
+  vol_period: 60
+  reference: ask
+  # quantile only: distance = quantile(next bar adverse move, q) over lookback bars * k
+  params: {direction: against, sides: long}
+
+# original strategy exits, all values are unleveraged price return in %
+exit:
+  stop_loss_pct: 3.0
+
+  # tier 0
+  low_threshold: 0.3
+  low_protect: 0.2
+
+  # tier 1
+  first_threshold: 0.8
+  trail_rate1: 0.35
+
+  # tier 2
+  second_threshold: 2.0
+  trail_rate2: 0.20
+
+  # experimental time stop, needs backtest validation
+  max_holding_minutes: 30
+
+risk:
+  margin_budget: 30
+  leverage: 10
+  max_leverage: 10
+  max_positions: 2
+  max_notional: 350
+  max_spread_pct: 0.05
+  min_quote_qty: 0.0
+  stale_after_s: 10
+  cost_reserve_pct: 1.0
+
+fee:
+  maker: 0.0002
+  taker: 0.0005
+  slippage_pct: 0.02
+  use_account_rate: false
+
+exchange:
+  testnet: true
+  data_testnet: false
+  history_bars: 1000
+  heartbeat_s: 30
+
+paper:
+  balance: 1000
+
+# --mode live; exchange.testnet picks testnet or mainnet, market data follows it
+live:
+  # exchange cancels open orders if not refreshed within this many seconds, 0 = off
+  # run `python -m kasegu.exchange.check` on testnet before turning it on
+  auto_cancel_s: 0
+  keepalive_min: 30
+
+# tick replay of data.binance.vision aggTrades, UTC days inclusive
+backtest:
+  start: 2026-10-01
+  end: 2026-10-07
+  cache_dir: data/history
+  out_dir: data/backtests
+
+db_path: data/journal.db
