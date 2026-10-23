@@ -1,0 +1,30 @@
+{
+ "group": "P_ema480",
+ "net_usdt": 776.6383638163654,
+ "avg_net_pct": 0.18109030373363494,
+ "avg_gross_pct": 0.25097898782588585,
+ "cost_pct": 0.0698886840922509,
+ "is_avg_net_pct": 0.16976790057077007,
+ "oos_avg_net_pct": 0.20067442262592483,
+ "pos_months": 22,
+ "months": 24,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 449,
+  "max_hold": 393,
+  "trail_t1": 356,
+  "trail_t2": 126,
+  "stop_loss": 120
+ },
+ "expectancy": {
+  "trades": 1444,
+  "win_rate": 0.7576177285318559,
+  "avg_win_pct": 0.6796553446479734,
+  "avg_loss_pct": 1.3772815670100402,
+  "payoff": 0.4934759608548647,
+  "breakeven_win_rate": 0.6695789059956484,
+  "expectancy_pct": 0.18109030373363488
+ },
+ "candidates": {}
+}

@@ -1,0 +1,30 @@
+{
+ "group": "P_vol30",
+ "net_usdt": 580.940698826627,
+ "avg_net_pct": 0.16451045323621039,
+ "avg_gross_pct": 0.23440730785733838,
+ "cost_pct": 0.069896854621128,
+ "is_avg_net_pct": 0.2486512483379358,
+ "oos_avg_net_pct": 0.02484049805616506,
+ "pos_months": 20,
+ "months": 24,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 412,
+  "trail_t0": 387,
+  "trail_t1": 237,
+  "trail_t2": 86,
+  "stop_loss": 67
+ },
+ "expectancy": {
+  "trades": 1189,
+  "win_rate": 0.7258200168208578,
+  "avg_win_pct": 0.5867084600758836,
+  "avg_loss_pct": 0.953148687569428,
+  "payoff": 0.615547676587602,
+  "breakeven_win_rate": 0.6189851370479043,
+  "expectancy_pct": 0.16451045323621022
+ },
+ "candidates": {}
+}

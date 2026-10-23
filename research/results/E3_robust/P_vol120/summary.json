@@ -1,0 +1,30 @@
+{
+ "group": "P_vol120",
+ "net_usdt": 259.2591596190264,
+ "avg_net_pct": 0.04945758999227903,
+ "avg_gross_pct": 0.11934673304718789,
+ "cost_pct": 0.06988914305490887,
+ "is_avg_net_pct": 0.048054542391179025,
+ "oos_avg_net_pct": 0.051997821078983986,
+ "pos_months": 17,
+ "months": 24,
+ "pos_coins": 18,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 574,
+  "trail_t1": 423,
+  "max_hold": 401,
+  "stop_loss": 204,
+  "trail_t2": 163
+ },
+ "expectancy": {
+  "trades": 1765,
+  "win_rate": 0.7541076487252124,
+  "avg_win_pct": 0.6286839695111242,
+  "avg_loss_pct": 1.7269256153984647,
+  "payoff": 0.3640480886410755,
+  "breakeven_win_rate": 0.7331119836077362,
+  "expectancy_pct": 0.04945758999227895
+ },
+ "candidates": {}
+}

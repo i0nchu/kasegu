@@ -1,0 +1,30 @@
+{
+ "group": "P_ema120",
+ "net_usdt": 789.6377633538209,
+ "avg_net_pct": 0.17772145774901887,
+ "avg_gross_pct": 0.247649215511855,
+ "cost_pct": 0.06992775776283615,
+ "is_avg_net_pct": 0.1977429671835518,
+ "oos_avg_net_pct": 0.14328446152162228,
+ "pos_months": 23,
+ "months": 24,
+ "pos_coins": 21,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 462,
+  "max_hold": 414,
+  "trail_t1": 371,
+  "trail_t2": 127,
+  "stop_loss": 122
+ },
+ "expectancy": {
+  "trades": 1496,
+  "win_rate": 0.7566844919786097,
+  "avg_win_pct": 0.6668968766071885,
+  "avg_loss_pct": 1.3435603393593554,
+  "payoff": 0.49636540843798826,
+  "breakeven_win_rate": 0.6682859643513616,
+  "expectancy_pct": 0.17772145774901882
+ },
+ "candidates": {}
+}

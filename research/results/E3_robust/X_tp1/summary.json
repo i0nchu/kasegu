@@ -1,0 +1,28 @@
+{
+ "group": "X_tp1",
+ "net_usdt": 3.4840587219367336,
+ "avg_net_pct": 0.0008045841870780671,
+ "avg_gross_pct": 0.058809155431460466,
+ "cost_pct": 0.058004571244382415,
+ "is_avg_net_pct": 0.0034668671394318166,
+ "oos_avg_net_pct": -0.0037884759344593206,
+ "pos_months": 16,
+ "months": 24,
+ "pos_coins": 14,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 739,
+  "take_profit": 569,
+  "stop_loss": 150
+ },
+ "expectancy": {
+  "trades": 1458,
+  "win_rate": 0.6412894375857339,
+  "avg_win_pct": 0.6991668375232336,
+  "avg_loss_pct": 1.2477015474941944,
+  "payoff": 0.5603638457669596,
+  "breakeven_win_rate": 0.6408761666151486,
+  "expectancy_pct": 0.0008045841870780168
+ },
+ "candidates": {}
+}

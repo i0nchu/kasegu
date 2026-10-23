@@ -154,6 +154,8 @@ def signals(df: pd.DataFrame, cfg: Cfg) -> pd.DataFrame:
     side = np.sign(c - ema)
     if cfg.trend == "against":
         side = -side
+    elif cfg.trend == "none":
+        side = np.ones_like(side)  # ignore the trend: long orders always (use with sides=long)
     if cfg.model == "atr_amplitude":
         dist = (atr_pct + amp_pct) / 2 * cfg.k
     elif cfg.model == "atr_only":

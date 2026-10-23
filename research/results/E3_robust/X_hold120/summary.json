@@ -1,0 +1,27 @@
+{
+ "group": "X_hold120",
+ "net_usdt": 1124.1558321870798,
+ "avg_net_pct": 0.2723047821590194,
+ "avg_gross_pct": 0.34046675150599554,
+ "cost_pct": 0.06816196934697602,
+ "is_avg_net_pct": 0.24254981902832976,
+ "oos_avg_net_pct": 0.3227036925780559,
+ "pos_months": 19,
+ "months": 24,
+ "pos_coins": 11,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 1373,
+  "stop_loss": 17
+ },
+ "expectancy": {
+  "trades": 1390,
+  "win_rate": 0.5582733812949641,
+  "avg_win_pct": 2.339035016948362,
+  "avg_loss_pct": 2.3397190976398883,
+  "payoff": 0.9997076227260715,
+  "breakeven_win_rate": 0.5000731050056033,
+  "expectancy_pct": 0.2723047821590199
+ },
+ "candidates": {}
+}

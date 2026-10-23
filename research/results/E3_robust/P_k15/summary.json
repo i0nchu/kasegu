@@ -1,0 +1,30 @@
+{
+ "group": "P_k15",
+ "net_usdt": 643.3529190932502,
+ "avg_net_pct": 0.2951187254439262,
+ "avg_gross_pct": 0.36511250649281296,
+ "cost_pct": 0.06999378104888673,
+ "is_avg_net_pct": 0.3775844946659802,
+ "oos_avg_net_pct": 0.14297257757688075,
+ "pos_months": 22,
+ "months": 24,
+ "pos_coins": 23,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 216,
+  "trail_t1": 191,
+  "max_hold": 174,
+  "trail_t2": 95,
+  "stop_loss": 58
+ },
+ "expectancy": {
+  "trades": 734,
+  "win_rate": 0.7929155313351499,
+  "avg_win_pct": 0.7490953799043684,
+  "avg_loss_pct": 1.443133990976977,
+  "payoff": 0.5190754182134146,
+  "breakeven_win_rate": 0.6582951629722904,
+  "expectancy_pct": 0.2951187254439264
+ },
+ "candidates": {}
+}

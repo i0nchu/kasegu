@@ -1,0 +1,30 @@
+{
+ "group": "P_sl5",
+ "net_usdt": 818.3322004310094,
+ "avg_net_pct": 0.1873098078979254,
+ "avg_gross_pct": 0.25722539204194095,
+ "cost_pct": 0.06991558414401552,
+ "is_avg_net_pct": 0.195505236709797,
+ "oos_avg_net_pct": 0.1732215476483124,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 474,
+  "max_hold": 421,
+  "trail_t1": 373,
+  "trail_t2": 133,
+  "stop_loss": 70
+ },
+ "expectancy": {
+  "trades": 1471,
+  "win_rate": 0.7797416723317471,
+  "avg_win_pct": 0.6809621517978511,
+  "avg_loss_pct": 1.5602804342416263,
+  "payoff": 0.4364357437634809,
+  "breakeven_win_rate": 0.6961675830900633,
+  "expectancy_pct": 0.1873098078979254
+ },
+ "candidates": {}
+}

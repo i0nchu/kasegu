@@ -1,0 +1,30 @@
+{
+ "group": "P_no_trend",
+ "net_usdt": 736.7220017092619,
+ "avg_net_pct": 0.12714225834446666,
+ "avg_gross_pct": 0.19709681546567978,
+ "cost_pct": 0.06995455712121311,
+ "is_avg_net_pct": 0.15334918208164683,
+ "oos_avg_net_pct": 0.08406773464094429,
+ "pos_months": 20,
+ "months": 24,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 644,
+  "trail_t0": 566,
+  "trail_t1": 453,
+  "stop_loss": 148,
+  "trail_t2": 140
+ },
+ "expectancy": {
+  "trades": 1951,
+  "win_rate": 0.7180932854946181,
+  "avg_win_pct": 0.6256437126804699,
+  "avg_loss_pct": 1.1426769007914255,
+  "payoff": 0.5475245996896805,
+  "breakeven_win_rate": 0.6461932819682004,
+  "expectancy_pct": 0.12714225834446663
+ },
+ "candidates": {}
+}

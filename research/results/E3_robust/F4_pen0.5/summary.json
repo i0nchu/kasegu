@@ -1,0 +1,30 @@
+{
+ "group": "F4_pen0.5",
+ "net_usdt": 13.672847704443662,
+ "avg_net_pct": 0.008686136652337032,
+ "avg_gross_pct": 0.07858504615654736,
+ "cost_pct": 0.06989890950421034,
+ "is_avg_net_pct": -0.01517861142669999,
+ "oos_avg_net_pct": 0.0702829864239056,
+ "pos_months": 13,
+ "months": 24,
+ "pos_coins": 13,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t1": 138,
+  "trail_t0": 126,
+  "stop_loss": 109,
+  "trail_t2": 79,
+  "max_hold": 78
+ },
+ "expectancy": {
+  "trades": 530,
+  "win_rate": 0.6735849056603773,
+  "avg_win_pct": 1.0879248623580424,
+  "avg_loss_pct": 2.218413430266373,
+  "payoff": 0.4904067237942259,
+  "breakeven_win_rate": 0.6709577889277328,
+  "expectancy_pct": 0.008686136652336751
+ },
+ "candidates": {}
+}

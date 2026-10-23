@@ -41,7 +41,7 @@ def expectancy(net: pd.Series) -> dict:
 
 
 def _one(args):
-    symbol, cfg, folder, control, seed, n_ctrl = args
+    symbol, cfg, folder, control, seed, n_ctrl, log = args
     df, fund = bars(symbol, cfg.extra.get("months"))
     if df.empty:
         return pd.DataFrame(), {}
@@ -56,6 +56,9 @@ def _one(args):
         entries = np.c_[pick, sig.want.to_numpy()[pick - 1]]
         tr = simulate(df, cfg, fund, sig=sig, entries=entries)
         counts = {"random_entries": int(len(pick))}
+    elif not log:
+        tr = simulate(df, cfg, fund)
+        counts = {}
     else:
         tr, cand = simulate(df, cfg, fund, log=True)
         (folder / "candidates").mkdir(parents=True, exist_ok=True)
@@ -77,6 +80,7 @@ def group(
     n_ctrl: dict | None = None,
     seed: int = 7,
     note: str = "",
+    log: bool = True,
 ) -> pd.DataFrame:
     folder = RUNS / exp / name
     folder.mkdir(parents=True, exist_ok=True)
@@ -88,7 +92,7 @@ def group(
         "cfg": asdict(cfg),
     }
     (folder / "config.json").write_text(json.dumps(snap, indent=1))
-    jobs = [(s, cfg, folder, control, seed, n_ctrl or {}) for s in symbols]
+    jobs = [(s, cfg, folder, control, seed, n_ctrl or {}, log) for s in symbols]
     with ProcessPoolExecutor(8) as ex:
         res = list(ex.map(_one, jobs))
     tr = pd.concat([r[0] for r in res if not r[0].empty], ignore_index=True)
