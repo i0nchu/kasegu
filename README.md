@@ -55,7 +55,7 @@ uv run python -m kasegu.backtest.report data/backtests/exp1_* --sort pf --csv ex
 | `epr15` | (ATR/收盤% + 平均振幅%) / 2 × 12，只在收盤 < EMA240 時掛多單 | 凍結為 12，見 [docs/epr15.md](docs/epr15.md) |
 
 `epr15` 的參數與出場已凍結（git tag `alpha-epr15-v1`），設定不符會在啟動時拒絕執行，
-範例設定在 `configs/epr15.example.yaml`。
+小額帳戶 / Shadow 範例在 `configs/epr15.example.yaml`，研究重現設定（40 幣、每筆 297 USDT，非實盤建議）在 `configs/epr15.research.yaml`。
 
 `quantile` 多單看下一根最低價跌破本根收盤的幅度、空單看下一根最高價突破的幅度，分開估計，
 只用決策當下已收盤的 K 線。參數放在 `strategy.params`：`q`（預設 0.95）、`lookback`（預設 720 根）。
@@ -112,12 +112,13 @@ uv run python -m kasegu --mode live --confirm-live
 - 啟動或重連時，若交易所有本地沒有紀錄的倉位，會接手管理：掛停損並套用出場規則。
 - `risk.max_daily_loss`（USDT／UTC 日）與 `risk.max_consecutive_losses` 觸發後暫停新進場，
   既有倉位照常保護與出場；重啟後會從 journal 讀回當日已實現損益。
-- 委託狀態未知（下單或撤單失敗且查不到結果）、或交易所停損單被交易所端取消／過期時，
-  發出 critical 告警並暫停所有幣種的新進場，每 30 秒重新對帳，確認交易所狀態後才恢復。
-  遺失的停損會立即重掛，重掛被拒則市價平倉。
+- 委託狀態未知、撤單未確認（含交易所回傳舊狀態）、停損未確認或被交易所端取消時，
+  發出 critical 告警並暫停所有幣種的新進場，每 30 秒重新對帳；所有委託、倉位與停損都確認後才恢復。
+  細節見 [docs/epr15.md](docs/epr15.md) 第 6 節。
 - 撤單結果未確認時不會掛新的進場單，避免兩張進場單同時在簿上。
-- 倉位數量改變時先掛新停損，成功後才撤舊停損，過程中不會沒有保護。
-- `risk.max_loss_per_trade`：以固定停損計算的單筆最大虧損（USDT），提高槓桿不會繞過。
+- 倉位數量改變時先掛新停損，交易所確認後才撤舊停損；新停損未確認且舊停損不足時市價平倉。
+- `risk.max_loss_per_trade`：以固定停損價估算的單筆虧損上限（USDT），提高槓桿不會繞過；
+  不含跳空與滑價，實際損失可能更大。
 
 ## Docker 部署
 
@@ -148,7 +149,8 @@ docker compose stop        # SIGTERM：撤掉進場單，保留倉位與停損
 
 事件格式：`{"source", "tag", "kind", "level", "message", "symbol", "ts", "data"}`。
 主要事件有 `started`、`stopped`、`entry_filled`、`trade_closed`、`tier`（只記 journal）、
-`stop_rejected`、`stop_lost`、`order_unknown`、`reconciled`、`exit_rejected`、
+`stop_rejected`、`stop_lost`、`stop_unknown`、`order_unknown`、`entry_cancel_unconfirmed`、
+`stop_cancel_unconfirmed`、`sync_unconfirmed`、`untradable`、`reconciled`、`exit_rejected`、
 `position_adopted`、`position_resized`、`position_gone`、`loss_limit`、`disconnected`、`reconnected`。
 
 ## API Key
@@ -164,7 +166,8 @@ export BINANCE_API_SECRET=...
 
 ```
 configs/config.example.yaml  # 範例配置，複製成 configs/config.yaml 使用
-configs/epr15.example.yaml   # EPR15 凍結設定
+configs/epr15.example.yaml   # EPR15 小額帳戶 / Shadow 範例
+configs/epr15.research.yaml  # EPR15 研究重現（非實盤建議）
 docs/epr15.md                # EPR15 規格、研究版差異、Shadow 操作與上線檢查
 scripts/epr15_compare.py     # 研究模擬器與正式引擎逐筆比較
 src/kasegu/

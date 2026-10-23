@@ -10,7 +10,8 @@
 | 進場 | `src/kasegu/strategies/epr15.py` | `Epr15(AtrAmplitude)`，重用 `indicators.ema / atr / amplitude_pct` 與 `DistanceStrategy` 的掛單流程 |
 | 出場 | `src/kasegu/exits/time_only.py` | `TimeOnlyExit`：固定停損 + 成交後 N 分鐘市價出場，不啟動追蹤級距 |
 | 出場介面 | `src/kasegu/exits/base.py` | `ExitPolicy` 與 `create_exit`；原本的三級追蹤改名 `TrailingExit`（`ExitManager` 仍可匯入） |
-| 設定 | `configs/epr15.example.yaml` | 凍結參數與小額帳戶風控範例 |
+| 設定 | `configs/epr15.example.yaml` | Shadow / Testnet / 小額帳戶起點：6 幣、每筆 19.8 USDT、保守風控 |
+| 研究重現設定 | `configs/epr15.research.yaml` | 研究的 40 幣、每筆 297 USDT、無全域上限；只用於回測、比較與 Shadow 對照，**不是實盤建議** |
 | 比較 | `scripts/epr15_compare.py` | 研究交易與正式引擎 tick 回放逐筆比對 |
 
 Engine、Broker、RiskManager、PositionManager 沒有複製；backtest、paper、live 用同一個 `Epr15` 與 `TimeOnlyExit`。
@@ -69,7 +70,8 @@ Engine、Broker、RiskManager、PositionManager 沒有複製；backtest、paper�
 
 範圍：凍結研究結果 `research/results/A3_candidate/EPR15/trades.csv` 中，本機有 aggTrades 快取的
 215 天、40 幣、509 個（幣，日）組合，共 560 筆研究交易（全部 1,918 筆的 29%）。這些日子是 A2 為了檢查成交真實性而抽樣的交易日，
-不是隨機抽樣，所以只用來比對語意，不拿來估計績效。引擎每次回放一個幣、一個 UTC 日，關閉全域風控上限，成本與研究相同。
+不是隨機抽樣，所以只用來比對語意，不拿來估計績效。引擎每次回放一個幣、一個 UTC 日，使用 `configs/epr15.research.yaml` 並關閉全域風控上限，成本與研究相同。
+審查修正（委託確認、對帳）後重跑，結果與修正前完全相同。
 
 | 項目 | 結果 |
 |---|---|
@@ -103,6 +105,7 @@ Shadow 指「正式行情 + 模擬成交」：`--mode paper`，行情來自 Bina
 
 ```bash
 cp configs/epr15.example.yaml configs/epr15.yaml     # 依帳戶調整 symbols 與 risk
+# 想看研究同規模的 Shadow 對照，另開一份 configs/epr15.research.yaml（不同 journal）
 uv run python -m kasegu --mode paper --config configs/epr15.yaml --log-file data/logs/epr15.log
 ```
 
@@ -140,7 +143,53 @@ Paper 的限制：成交只看 bookTicker 的 Ask 低於掛單價，不模擬排
 之後的 Testnet 驗證：`exchange.testnet: true`，先跑 `uv run python -m kasegu.exchange.check --symbol BTCUSDT`，
 再 `--mode live --confirm-live`。Testnet 行情與正式環境不同，只驗證下單流程，不驗證策略績效。
 
-## 6. Live 上線前尚未完成的安全檢查
+## 6. 交易安全與異常處理
+
+**阻擋進場的條件**（`Engine.blocked`，任何一個幣種被阻擋，所有幣種都不掛新進場單；既有倉位照常保護與出場）：
+
+| 事件 | 觸發 | 引擎動作 |
+|---|---|---|
+| `order_unknown` | 下單重試 3 次都失敗、查詢也失敗 | 該單列為未確認，持續追蹤 |
+| `entry_cancel_unconfirmed` | 撤單失敗或交易所回傳仍為 NEW / PARTIALLY_FILLED（含部分成交後撤剩餘量） | 不當作已撤，不掛新單，之後的成交照常套用並調整停損 |
+| `stop_unknown` | 新停損送單結果未知 | 保留舊停損（不撤）；舊停損不足以覆蓋整個倉位時，以 reduce-only 市價平倉 |
+| `stop_rejected` | 新停損被拒 | 同上，保留舊停損或平倉 |
+| `stop_cancel_unconfirmed` | 換新停損或平倉後，舊停損撤不掉 | reduce-only，不會開倉，但等對帳清掉 |
+| `stop_lost` | 交易所端停損被取消或過期（非本程式撤單） | 立即重掛，重掛失敗則依上面兩列處理 |
+| `exit_rejected` | 出場單被拒（常見於交易所停損剛好先成交） | 下一個標記價格重試，並對帳 |
+| `sync_unconfirmed` | 對帳時任何一項無法確認，或對帳本身失敗 | 維持阻擋 |
+
+**停損替換順序**：倉位變大（部分成交後又成交）時，先送新停損，交易所確認有效且數量覆蓋整個倉位後才撤舊停損。
+新停損未確認時舊停損一定保留。
+
+**對帳（`sync`）解除阻擋的條件**，每個幣種都要同時成立，否則保持阻擋並每 30 秒重試：
+
+1. 先前未確認的委託都已查到結果（查不到 = 交易所沒有這張單）。
+2. 交易所上本程式的進場單、出場單全部撤銷成功（含上次程式異常終止時留下的）。
+3. 本地倉位改為交易所數字（不符時發 `position_resized` / `position_gone` / `position_adopted`）。
+4. 有倉位時：存在一張已確認、方向正確、數量覆蓋整個倉位的停損；多餘的停損都撤銷成功。
+5. 空倉時：所有停損撤銷成功，本地 `entry / stop / close` 參照全部清空，下一筆成交一定重新掛停損。
+
+**程式異常終止**（kill -9、當機、斷電）：交易所上的進場單會留著，最多再活到下次啟動。
+重新啟動時的 `sync` 會撤掉所有本程式留下的進場與出場單（`vt` 開頭的 client id，其他工具的單不動）；
+若這段期間進場單已成交，倉位會被接手（`position_adopted`）並掛上停損。
+停機期間的保護只有交易所端停損；停機中成交的進場單在重啟前**沒有**停損。
+要縮短這個空窗，可在 Testnet 驗證後開啟 `live.auto_cancel_s`（交易所倒數撤單，只在空倉時啟用）。
+
+**斷線或停機超過 15 分鐘**：
+
+- 重啟：本地倉位從 journal 讀回，成交時間不變，第一個標記價格就以 `time_exit` 平倉。
+- 未重啟只斷線：沒有標記價格就不會出場，交易所停損仍在；串流恢復後第一個標記價格平倉。
+- 接手的倉位（本地沒有紀錄）從接手時刻起算 15 分鐘，因為無法得知原本的成交時間。
+
+**`max_loss_per_trade` 只是預估**：以 `名義 × stop_loss_pct` 計算，代表價格剛好停在 −3% 時的損失。
+不包含跳空、標記價格落後、停損觸發後的市價滑價與手續費。第 4 節的回放中，真正停損的成交平均 −3.52%，最差 −6.36%，
+實際單筆損失可能是預估的兩倍以上。最壞情況要以 `max_positions × 名義 × 跳空幅度` 估算，
+因為急殺時所有掛著的買單可能同時成交（掛單中的單也計入 `max_positions` 與 `max_notional`）。
+
+**小額帳戶**：啟動時以最新收盤價檢查每個幣種的下單數量，低於 `minQty` 或 `MIN_NOTIONAL` 的會發 `untradable` 警告，
+這些幣種的訊號會被 Risk Manager 拒絕，數量永遠向下取整，不會為了達到最小名義而放大。
+
+## 7. Live 上線前尚未完成的安全檢查
 
 這個 PR 不啟用 live。以下項目完成並留下紀錄前，不應以正式資金執行：
 
@@ -154,9 +203,9 @@ Paper 的限制：成交只看 bookTicker 的 Ask 低於掛單價，不模擬排
 - [ ] 斷線演練：拔網路、`docker compose stop/start`、kill -9，確認倉位保有交易所停損、
       `order_unknown` 告警與阻擋進場、恢復後 `reconciled`。
 - [ ] Telegram 或 webhook 告警實際送達（critical 事件）。
-- [ ] 小額帳戶：每個要交易的幣種用 `exchangeInfo` 確認 297 USDT 名義 ≥ `MIN_NOTIONAL`、
-      數量 ≥ `minQty`；資金不足時降低 `margin_budget`，不要提高 `leverage`；
-      `max_loss_per_trade`、`max_positions × 297 ≤ max_notional`、`max_daily_loss` 符合可承受虧損。
+- [ ] 小額帳戶：從 `configs/epr15.example.yaml` 開始，不要用 `epr15.research.yaml`；啟動 log 沒有 `untradable`；
+      資金不足時降低 `margin_budget` 或減少幣種，不要提高 `leverage`；
+      `max_positions × 名義 × 可能跳空幅度`、`max_daily_loss` 在可承受範圍內。
 - [ ] 帳戶為單向持倉、逐幣槓桿已設好，帳戶中沒有其他程式的掛單或倉位（會被接手）。
 - [ ] 確認 `live.auto_cancel_s` 的設定（預設 0）；開啟前先在 Testnet 跑 check 第 2 段。
 - [ ] 資金費率：持有 15 分鐘通常不跨結算，但跨結算時照實收付，Shadow 報表要能看到。
