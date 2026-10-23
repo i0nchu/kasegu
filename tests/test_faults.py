@@ -367,3 +367,83 @@ def test_check_sizes_lists_untradable_symbols():
     eng, broker, clock = setup(cfg=cfg)
     # 0.99 USDT < 5 USDT min notional on both
     assert set(eng.check_sizes()) == {S, T} and "untradable" in kinds(eng)
+
+
+# ---- R09: restart with stops that do not match the exchange position
+
+
+def leftover_stop(broker, side, qty, px, filled=0.0):
+    o = Order(f"vts{len(broker.orders):024d}", S, side, OrderType.STOP_MARKET, qty, Purpose.STOP,
+              stop_price=px, reduce_only=True, filled_qty=filled)  # fmt: skip
+    broker.orders[o.client_id] = o
+    broker.live.setdefault(S, {})[o.client_id] = o
+    return o
+
+
+async def restart_with_mismatch(eng, broker, clock):
+    """Exchange long 0.6 of the entry while the journal knows 0.4, plus odd stops."""
+    await next_bar(eng, clock)
+    entry = broker.orders[eng.entry[S].client_id]
+    broker._fill(entry, entry.qty * 0.4, entry.price, maker=True)
+    await eng.drain()
+    old = broker.orders[eng.stop[S].client_id]
+    broker.listener = None  # crash: the late fill and these stops are not journaled
+    broker._fill(entry, entry.qty * 0.2, entry.price, maker=True)
+    small = leftover_stop(broker, Side.SELL, entry.qty * 0.1, old.stop_price)
+    wrong = leftover_stop(broker, Side.BUY, entry.qty * 0.6, old.stop_price * 1.1)
+    return old, small, wrong
+
+
+async def test_restart_multiple_and_wrong_side_stops_replaced_without_gap():
+    eng, broker, clock = setup()
+    old, small, wrong = await restart_with_mismatch(eng, broker, clock)
+    log = calls(broker)
+    eng2 = restart(eng)
+    await eng2.sync()
+    qty = broker.pos[S]
+    stops = open_stops(broker)
+    assert [x.qty for x in stops] == [pytest.approx(qty)] and stops[0].side is Side.SELL
+    first_place = next(i for i, x in enumerate(log) if x[0] == "place")
+    for o in (old, small):
+        assert log.index(("cancel", o.client_id)) > first_place
+    assert broker.orders[wrong.client_id].status is OrderStatus.CANCELED
+    assert not eng2.blocked
+
+
+async def test_restart_new_stop_timeout_keeps_old_stops_and_closes():
+    eng, broker, clock = setup()
+    old, small, wrong = await restart_with_mismatch(eng, broker, clock)
+    log = calls(broker)
+    place = broker.place
+
+    async def stop_timeout(o):
+        if o.type is OrderType.STOP_MARKET:
+            raise Timeout("REST timeout")
+        return await place(o)
+
+    broker.place, broker.query = stop_timeout, timeout
+    eng2 = restart(eng)
+    await eng2.sync()
+    # nothing confirmed covers the position: old stops are never cancelled first,
+    # the position is closed reduce-only and entries stay blocked
+    exit_at = next(i for i, x in enumerate(log) if x[0] == "place" and x[1] is OrderType.MARKET)
+    assert ("cancel", old.client_id) not in log[:exit_at]
+    assert ("cancel", small.client_id) not in log[:exit_at]
+    assert broker.pos[S] == pytest.approx(0) and eng2.trades[-1].reason == "stop_unknown"
+    assert S in eng2.blocked
+
+
+async def test_restart_partly_triggered_stop_counts_remaining_only():
+    eng, broker, clock = setup()
+    await fill_entry(eng, clock)
+    so = broker.orders[eng.stop[S].client_id]
+    broker.listener = None
+    # the stop child filled part of the order before the crash
+    broker._fill(so, so.qty * 0.5, so.stop_price, maker=False)
+    assert so.is_open and broker.pos[S] == pytest.approx(so.qty * 0.5)
+    log = calls(broker)
+    eng2 = restart(eng)
+    await eng2.sync()
+    # remaining 0.5 equals the position: kept, no replacement needed
+    assert not [x for x in log if x[0] == "place"] and eng2.stop[S].client_id == so.client_id
+    assert not eng2.blocked
