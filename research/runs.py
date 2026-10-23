@@ -9,6 +9,7 @@ Each group writes data/research/runs/<exp>/<group>/:
 """
 
 import json
+import zlib
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -52,7 +53,8 @@ def _one(args):
         sig = signals(df, cfg)
         live = (sig.want.to_numpy() != 0) & ~sig.filtered.to_numpy()
         ok = np.flatnonzero(live[:-1]) + 1
-        rng = np.random.default_rng(seed + hash(symbol) % 10_000)
+        # crc32, not hash(): str hashes change every run, which made controls unrepeatable
+        rng = np.random.default_rng(seed + zlib.crc32(symbol.encode()) % 10_000)
         pick = np.sort(rng.choice(ok, size=min(n_ctrl.get(symbol, 0), len(ok)), replace=False))
         entries = np.c_[pick, sig.want.to_numpy()[pick - 1]]
         tr = simulate(df, cfg, fund, sig=sig, entries=entries)
