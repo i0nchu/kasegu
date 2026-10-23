@@ -1,0 +1,62 @@
+{
+ "exp": "B3_relative_value",
+ "lookbacks": [
+  15,
+  60,
+  240,
+  1440
+ ],
+ "holds": [
+  15,
+  60,
+  240
+ ],
+ "coins_per_side": 8,
+ "costs_pct_per_side": {
+  "maker": 0.02,
+  "taker": 0.07
+ },
+ "symbols": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "BNBUSDT",
+  "XRPUSDT",
+  "DOGEUSDT",
+  "ADAUSDT",
+  "AVAXUSDT",
+  "LINKUSDT",
+  "DOTUSDT",
+  "LTCUSDT",
+  "BCHUSDT",
+  "TRXUSDT",
+  "SUIUSDT",
+  "1000PEPEUSDT",
+  "WIFUSDT",
+  "ARBUSDT",
+  "OPUSDT",
+  "APTUSDT",
+  "NEARUSDT",
+  "TIAUSDT",
+  "INJUSDT",
+  "SEIUSDT",
+  "ENAUSDT",
+  "1000BONKUSDT",
+  "FETUSDT",
+  "ORDIUSDT",
+  "WLDUSDT",
+  "1000FLOKIUSDT",
+  "AAVEUSDT",
+  "ATOMUSDT",
+  "CRVUSDT",
+  "ETCUSDT",
+  "FILUSDT",
+  "HBARUSDT",
+  "JUPUSDT",
+  "ONDOUSDT",
+  "PENDLEUSDT",
+  "UNIUSDT",
+  "XLMUSDT"
+ ],
+ "beta_window_min": 4320
+}

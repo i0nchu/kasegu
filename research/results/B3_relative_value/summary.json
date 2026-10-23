@@ -1,0 +1,28 @@
+{
+ "chosen_by_year1": {
+  "L": 15,
+  "H": 240
+ },
+ "row": {
+  "rule": "reversal",
+  "L": 15,
+  "H": 240,
+  "rebalances": 4355,
+  "turnover_per_rebalance": 1.5185993111366245,
+  "gross_bp": 1.3088432862918307,
+  "gross_lo_bp": 0.018407159500458257,
+  "gross_hi_bp": 2.579968323226153,
+  "gross_beta_neutral_bp": 1.2116280208549717,
+  "net_maker_bp": -1.7283553359814186,
+  "net_maker_lo_bp": -3.01491742310891,
+  "net_maker_hi_bp": -0.45918041597176623,
+  "net_taker_bp": -9.321351891664541,
+  "net_taker_lo_bp": -10.604273843944284,
+  "net_taker_hi_bp": -8.051652912492965,
+  "daily_sharpe_net_maker": -1.8418387326224432,
+  "y1_gross_bp": 1.841735445846097,
+  "y2_gross_bp": 0.7815502677470425,
+  "pos_months_gross": 17,
+  "book_beta": 0.0043035274458073335
+ }
+}
