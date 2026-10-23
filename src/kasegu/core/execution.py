@@ -204,20 +204,31 @@ class PaperBroker(Broker):
 
 
 class Execution:
-    """Local order book on top of a broker with idempotent submit."""
+    """Local order book on top of a broker with idempotent submit.
+
+    An order is unconfirmed while no broker answer about it was seen (place and the
+    follow up queries failed, or a cancel could not be read back).
+    """
 
     def __init__(self, broker: Broker, retries: int = 3):
         self.broker = broker
         self.retries = retries
         self.orders: dict[str, Order] = {}
-        self.unknown: set[str] = set()  # symbols with unknown order state
+        self.unconfirmed: dict[str, Order] = {}  # client id -> last local state
+
+    @property
+    def unknown(self) -> set[str]:
+        """Symbols with an order in unknown state."""
+        return {o.symbol for o in self.unconfirmed.values()}
+
+    def confirmed(self, o: Order) -> bool:
+        return o.client_id not in self.unconfirmed
 
     async def submit(self, o: Order) -> Order:
         self.orders[o.client_id] = o
         for i in range(self.retries):
             try:
                 res = await self.broker.place(o)
-                self.unknown.discard(o.symbol)
                 return self._merge(res)
             except Exception as e:
                 log.warning("place %s failed: %s", o.client_id, e)
@@ -226,10 +237,11 @@ class Execution:
                 if found is not None:
                     return self._merge(found)
                 await asyncio.sleep(0.2 * (i + 1))
-        self.unknown.add(o.symbol)
+        self.unconfirmed[o.client_id] = o
         return o
 
     async def cancel(self, o: Order) -> Order:
+        """Cancel and return the state the broker reports; an open result is not cancelled."""
         try:
             res = await self.broker.cancel(o.symbol, o.client_id)
         except Exception as e:
@@ -238,9 +250,27 @@ class Execution:
         if res is None:
             res = await self._safe_query(o)
         if res is None:
-            self.unknown.add(o.symbol)
-            return o
+            self.unconfirmed[o.client_id] = self.orders.get(o.client_id, o)
+            return self.unconfirmed[o.client_id]
         return self._merge(res)
+
+    async def recheck(self, symbol: str) -> bool:
+        """Query unconfirmed orders of a symbol again; True when none is left."""
+        for cid, o in list(self.unconfirmed.items()):
+            if o.symbol != symbol:
+                continue
+            try:
+                res = await self.broker.query(symbol, cid)
+            except Exception as e:
+                log.warning("query %s failed: %s", cid, e)
+                continue
+            if res is None:
+                # the exchange does not know it: never placed
+                self.unconfirmed.pop(cid, None)
+                o.status = OrderStatus.EXPIRED
+            else:
+                self._merge(res)
+        return symbol not in self.unknown
 
     async def _safe_query(self, o: Order) -> Order | None:
         try:
@@ -250,6 +280,8 @@ class Execution:
             return None
 
     def _merge(self, o: Order) -> Order:
+        # any broker answer about an order confirms its state
+        self.unconfirmed.pop(o.client_id, None)
         cur = self.orders.get(o.client_id)
         # never move filled qty backwards
         if cur is not None and cur.filled_qty > o.filled_qty:
