@@ -1,3 +1,4 @@
+# ruff: noqa: E741
 """Fast 1m bar approximation of the kasegu engine for parameter and factor research.
 
 Same rules as the engine (EMA trend, limit at k x volatility from the close, fixed stop,
@@ -47,6 +48,7 @@ class Cfg:
     notional: float = 297.0  # 30 margin x10 minus 1% cost reserve
     trend: str = "with"  # with | against
     level_slip: float = 0.03  # % extra loss on stop / trailing exits, ticks jump past the level
+    mode: str = "fade"  # fade: limit order (engine) | breakout: stop order the other way
     tick: float = 0.0  # price tick; quotes are last trade +- tick / 2 like the replay
     extra: dict = field(default_factory=dict)
 
@@ -234,21 +236,28 @@ def simulate(
         if j < free_from:
             continue
         sd, px = int(s_prev[j]), lim_prev[j]
-        x, reason, exit_px, peak, trough, stop = _run_exit(j, sd, px, O, H, L, C, n, cfg)
+        if cfg.mode == "breakout":
+            # stop market the other way at the same level: taker fill with slippage
+            ps = -sd
+            entry = (px - half * sd) * (1 + cfg.slip / 100 * ps)
+            fee_in = cfg.taker
+        else:
+            ps, entry, fee_in = sd, px, cfg.maker
+        x, reason, exit_px, peak, trough, stop = _run_exit(j, sd, px, O, H, L, C, n, cfg, ps, entry)
         free_from = x + 1
-        gross = (exit_px - px) / px * 100 * sd
-        fees = cfg.maker + cfg.taker * exit_px / px
+        gross = (exit_px - entry) / entry * 100 * ps
+        fees = fee_in + cfg.taker * exit_px / entry
         fund = 0.0
         if len(ft):
             a, b = np.searchsorted(ft, [t[j], t[x] + MIN])
-            fund = float(-sd * fr[a:b].sum() * 100)
+            fund = float(-ps * fr[a:b].sum() * 100)
         sg = sig.iloc[j - 1]
         rows.append(
             {
                 "t": t[j],
                 "exit_t": t[x],
-                "side": sd,
-                "entry": px,
+                "side": ps,
+                "entry": entry,
                 "exit": exit_px,
                 "reason": reason,
                 "gross": gross,
@@ -263,21 +272,27 @@ def simulate(
     return pd.DataFrame(rows)
 
 
-def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg):
-    """Walk the bar path from the fill. Returns (exit bar, reason, exit price, mfe, mae, stop)."""
+def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None):
+    """Walk the bar path from the fill. Returns (exit bar, reason, exit price, mfe, mae, stop).
+
+    sd / px: the order side and price that trigger the fill.
+    ps / entry: position side and entry price (default: the limit order itself).
+    """
+    ps = sd if ps is None else ps
+    entry = px if entry is None else entry
     peak, trough, stop, tier = 0.0, 0.0, None, -1
     slip = cfg.slip / 100
 
     def prof(p):
-        return (p - px) / px * 100 * sd
+        return (p - entry) / entry * 100 * ps
 
     half = cfg.tick / 2
 
     def out(p):  # taker exit at the bid/ask with slippage against us
-        return (p - half * sd) * (1 - slip * sd)
+        return (p - half * ps) * (1 - slip * ps)
 
     def level_px(pct):
-        return px * (1 + sd * pct / 100)
+        return entry * (1 + ps * pct / 100)
 
     filled = False
     last = None
@@ -286,7 +301,7 @@ def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg):
         if not filled:
             # find the fill on the path, then continue from the limit price
             i = next((i for i, a in enumerate(pts) if (a + half * sd - px) * sd < 0), 3)
-            pts = pts if i == 0 else (px,) + pts[i:]
+            pts = pts if i == 0 else (entry,) + pts[i:]
             filled = True
         elif last is not None:
             pts = (last,) + pts  # gap from the previous close to this open
