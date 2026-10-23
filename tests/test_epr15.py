@@ -263,6 +263,10 @@ async def test_time_exit_races_exchange_stop():
     await eng.drain()
     assert len(eng.trades) == 1 and eng.trades[0].exit_price == pytest.approx(px * 0.97)
     assert pos.state is PosState.FLAT and broker.pos[S] == pytest.approx(0)
+    # entries wait for a reconcile
+    assert eng.blocked == {S: "exit_rejected"}
+    await eng.sync()
+    assert not eng.blocked
 
 
 async def test_partial_fill_keeps_full_stop_cover():

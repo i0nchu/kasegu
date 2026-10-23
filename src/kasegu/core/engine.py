@@ -492,9 +492,10 @@ class Engine:
         self._check_unknown(res)
         await self.drain()
         if res.status is OrderStatus.REJECTED and pos.has_qty:
-            # retry on the next mark price
+            # retry on the next mark price; e.g. the exchange stop already closed it and the
+            # fill is not here yet: reconcile so a lost event cannot keep it retrying
             pos.state = PosState.POSITION_OPEN
-            self.alert("exit_rejected", s, f"exit rejected ({res.reason}), retrying", "warning")
+            self.block(s, "exit_rejected", f"exit rejected ({res.reason}), retrying")
 
     async def _adopt(self, s: str, qty: float):
         """Exchange position without a matching local record: manage it from now on."""
