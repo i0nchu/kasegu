@@ -66,6 +66,10 @@ class Broker(ABC):
     async def position_qty(self, symbol: str) -> float:
         """Signed position size from the exchange."""
 
+    async def entry_price(self, symbol: str) -> float:
+        """Average entry of the exchange position, 0 if unknown."""
+        return 0.0
+
     async def before_protect(self, symbol: str):  # noqa: B027
         """Called before a stop is placed, e.g. to stop an order countdown."""
 

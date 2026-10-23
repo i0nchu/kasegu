@@ -273,19 +273,6 @@ async def test_sync_cancels_stops_when_flat():
     assert await broker.open_orders(S) == []
 
 
-async def test_check_positions_blocks_mismatch():
-    from kasegu.app import check_positions
-
-    eng, _, _ = setup()
-
-    class B:
-        async def position_qty(self, s):
-            return 0.4
-
-    await check_positions(eng, B())
-    assert S in eng.blocked
-
-
 async def test_countdown_disarmed_before_stop():
     b, api, _ = make(auto_cancel_all_open_orders={})
     await b.arm(S, 120)

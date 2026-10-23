@@ -1,0 +1,21 @@
+# Setup:
+#   cp configs/config.example.yaml configs/config.yaml   # strategy, symbols, risk
+#   cp .env.example .env                                 # mode, API keys, alerts
+#   docker compose up -d --build
+#   docker compose logs -f
+services:
+  kasegu:
+    build: .
+    image: kasegu:local
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data  # journal db, status.json, events.jsonl, cache
+    # time for the shutdown to cancel entry orders after `docker compose stop`
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

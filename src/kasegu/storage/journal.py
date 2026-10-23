@@ -113,5 +113,12 @@ class Journal:
         ).fetchall()
         return [json.loads(r[0]) for r in rows]
 
+    def trades_since(self, ts: int) -> list[dict]:
+        """Closed trades of every run since ts (ms)."""
+        rows = self.db.execute(
+            "SELECT data FROM trades WHERE ts >= ? ORDER BY id", (ts,)
+        ).fetchall()
+        return [json.loads(r[0]) for r in rows]
+
     def close(self):
         self.db.close()
