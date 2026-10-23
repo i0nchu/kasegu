@@ -1,0 +1,33 @@
+{
+ "group": "G2_bracket",
+ "net_usdt": -15025.657512873047,
+ "avg_net_pct": -0.11033397910122127,
+ "avg_gross_pct": -0.046293103424657554,
+ "cost_pct": 0.06404087567656373,
+ "is_avg_net_pct": -0.1171306939988418,
+ "oos_avg_net_pct": -0.10377923447521087,
+ "pos_months": 0,
+ "months": 12,
+ "pos_coins": 0,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 25888,
+  "stop_loss": 10814,
+  "take_profit": 9149,
+  "end_of_data": 2
+ },
+ "expectancy": {
+  "trades": 45853,
+  "win_rate": 0.3756133731707849,
+  "avg_win_pct": 0.36318862178818195,
+  "avg_loss_pct": 0.395191811972971,
+  "payoff": 0.9190185899221569,
+  "breakeven_win_rate": 0.5210996940058638,
+  "expectancy_pct": -0.11033397910122131
+ },
+ "candidates": {
+  "expired": 13717602,
+  "rejected:in_position": 933185,
+  "filled": 45853
+ }
+}

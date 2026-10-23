@@ -5,6 +5,7 @@ Usage: uv run python research/download.py --months 2025-10:2026-09 BTCUSDT ETHUS
 
 import argparse
 import concurrent.futures as cf
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -35,11 +36,17 @@ def fetch(rel: str) -> str:
     if path.exists():
         return f"cached {rel}"
     path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with urllib.request.urlopen(f"{BASE}/{rel}", timeout=120) as r:
-            data = r.read()
-    except urllib.error.HTTPError as e:
-        return f"{e.code} {rel}"
+    for i in range(5):
+        try:
+            with urllib.request.urlopen(f"{BASE}/{rel}", timeout=120) as r:
+                data = r.read()
+            break
+        except urllib.error.HTTPError as e:
+            return f"{e.code} {rel}"
+        except OSError as e:  # connection reset / timeout: back off and retry
+            if i == 4:
+                return f"failed {rel}: {e}"
+            time.sleep(2**i)
     tmp = path.with_suffix(".part")
     tmp.write_bytes(data)
     tmp.rename(path)

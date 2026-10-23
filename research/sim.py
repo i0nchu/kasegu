@@ -48,6 +48,10 @@ class Cfg:
     notional: float = 297.0  # 30 margin x10 minus 1% cost reserve
     trend: str = "with"  # with | against
     level_slip: float = 0.03  # % extra loss on stop / trailing exits, ticks jump past the level
+    sides: str = "both"  # both | long | short
+    exit: str = "tiers"  # tiers (engine) | time: hard stop + max hold only | bracket: tp / sl
+    tp: float = 0.0  # take profit % for exit = bracket
+    penetrate: float = 0.0  # % the price must trade beyond the limit to count as filled
     mode: str = "fade"  # fade: limit order (engine) | breakout: stop order the other way
     tick: float = 0.0  # price tick; quotes are last trade +- tick / 2 like the replay
     extra: dict = field(default_factory=dict)
@@ -167,6 +171,10 @@ def signals(df: pd.DataFrame, cfg: Cfg) -> pd.DataFrame:
     ok = np.isfinite(dist) & (dist > 0)
     ok[:warm] = False
     side = np.where(ok, side, 0)
+    if cfg.sides == "long":
+        side = np.where(side > 0, side, 0)
+    elif cfg.sides == "short":
+        side = np.where(side < 0, side, 0)
     half = cfg.tick / 2
     ref = c + half  # engine reference is the ask
     limit = ref * (1 - side * dist / 100)
@@ -176,13 +184,15 @@ def signals(df: pd.DataFrame, cfg: Cfg) -> pd.DataFrame:
             np.floor(limit / cfg.tick + 1e-9) * cfg.tick,
             np.ceil(limit / cfg.tick - 1e-9) * cfg.tick,
         )
-        # post-only: a limit at or through the touch is rejected
-        side = np.where((side > 0) & (limit >= c + half), 0, side)
-        side = np.where((side < 0) & (limit <= c - half), 0, side)
+    # post-only: a limit at or through the touch is rejected
+    post = ((side > 0) & (limit >= c + half)) | ((side < 0) & (limit <= c - half))
+    want = side.copy()
+    side = np.where(post, 0, side)
     out = pd.DataFrame(
         {
             "t": df.t.to_numpy(),
             "side": side.astype(int),
+            "want": want.astype(int),  # side before the post-only check
             "limit": limit,
             "dist": dist,
             "atr_pct": atr_pct,
@@ -212,8 +222,14 @@ def simulate(
     funding: np.ndarray | None = None,
     sig: pd.DataFrame | None = None,
     start_ms: int = 0,
-) -> pd.DataFrame:
-    """Sequential one-position-per-symbol simulation. Returns one row per trade."""
+    log: bool = False,
+    entries: np.ndarray | None = None,
+):
+    """Sequential one-position-per-symbol simulation. Returns one row per trade.
+
+    log: also return every candidate order with its outcome (filled / expired / rejected:why).
+    entries: control group, (bar, side) pairs entered at that bar's open instead of signals.
+    """
     sig = signals(df, cfg) if sig is None else sig
     t = df.t.to_numpy()
     O, H, L, C = (df[x].to_numpy() for x in "ohlc")
@@ -224,16 +240,24 @@ def simulate(
     s_prev, lim_prev = np.r_[0, side[:-1]], np.r_[np.nan, limit[:-1]]
     half = cfg.tick / 2
     # simulated fills need the opposite quote (trade +- half tick) through the limit
-    hit = ((s_prev > 0) & (L + half < lim_prev)) | ((s_prev < 0) & (H - half > lim_prev))
+    pen = lim_prev * cfg.penetrate / 100
+    hit = ((s_prev > 0) & (L + half < lim_prev - pen)) | (
+        (s_prev < 0) & (H - half > lim_prev + pen)
+    )
     hit &= t >= start_ms
     cand = np.flatnonzero(hit)
+    if entries is not None:
+        cand = entries[:, 0].astype(int)
+        s_prev = np.zeros(n, int)
+        s_prev[cand] = entries[:, 1]
+        lim_prev = O.copy()
     ft = funding[:, 0] if funding is not None and len(funding) else np.zeros(0)
     fr = funding[:, 1] if funding is not None and len(funding) else np.zeros(0)
 
-    rows = []
+    rows, spans = [], []
     free_from = 0
     for j in cand:
-        if j < free_from:
+        if j < free_from or j < 1:
             continue
         sd, px = int(s_prev[j]), lim_prev[j]
         if cfg.mode == "breakout":
@@ -243,10 +267,14 @@ def simulate(
             fee_in = cfg.taker
         else:
             ps, entry, fee_in = sd, px, cfg.maker
-        x, reason, exit_px, peak, trough, stop = _run_exit(j, sd, px, O, H, L, C, n, cfg, ps, entry)
+        x, reason, exit_px, peak, trough, stop = _run_exit(
+            j, sd, px, O, H, L, C, n, cfg, ps, entry, at_open=entries is not None
+        )
         free_from = x + 1
+        spans.append((j, x))
         gross = (exit_px - entry) / entry * 100 * ps
-        fees = fee_in + cfg.taker * exit_px / entry
+        fee_out = cfg.maker if reason == "take_profit" else cfg.taker
+        fees = fee_in + fee_out * exit_px / entry
         fund = 0.0
         if len(ft):
             a, b = np.searchsorted(ft, [t[j], t[x] + MIN])
@@ -266,13 +294,34 @@ def simulate(
                 "mfe": peak,
                 "mae": trough,
                 "hold": x - j + 1,
-                **{k: sg[k] for k in sig.columns if k not in ("t", "side", "limit")},
+                **{k: sg[k] for k in sig.columns if k not in ("t", "side", "want", "limit")},
             }
         )
-    return pd.DataFrame(rows)
+    tr = pd.DataFrame(rows)
+    if not log:
+        return tr
+    return tr, _candidates(sig, spans, t >= start_ms)
 
 
-def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None):
+def _candidates(sig: pd.DataFrame, spans, live) -> pd.DataFrame:
+    """One row per bar close where the strategy wanted an order, with what happened to it."""
+    want = sig.want.to_numpy()
+    n = len(want)
+    out = np.full(n, "expired", dtype=object)
+    out[(want != 0) & (sig.side.to_numpy() == 0)] = "rejected:post_only"
+    trade_id = np.full(n, -1)
+    for k, (j, x) in enumerate(spans):
+        out[j:x] = "rejected:in_position"  # bar closes while the position is open
+        out[j - 1] = "filled"
+        trade_id[j - 1] = k
+    keep = (want != 0) & live
+    c = sig.loc[keep, ["t", "want", "limit", "dist"]].rename(columns={"want": "side"})
+    c["outcome"] = out[keep]
+    c["trade_id"] = trade_id[keep]
+    return c.reset_index(drop=True)
+
+
+def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None, at_open=False):
     """Walk the bar path from the fill. Returns (exit bar, reason, exit price, mfe, mae, stop).
 
     sd / px: the order side and price that trigger the fill.
@@ -300,8 +349,9 @@ def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None):
         pts = _path(O[b], H[b], L[b], C[b])
         if not filled:
             # find the fill on the path, then continue from the limit price
-            i = next((i for i, a in enumerate(pts) if (a + half * sd - px) * sd < 0), 3)
-            pts = pts if i == 0 else (entry,) + pts[i:]
+            if not at_open:
+                i = next((i for i, a in enumerate(pts) if (a + half * sd - px) * sd < 0), 3)
+                pts = pts if i == 0 else (entry,) + pts[i:]
             filled = True
         elif last is not None:
             pts = (last,) + pts  # gap from the previous close to this open
@@ -311,6 +361,16 @@ def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None):
             if p1 >= p0:
                 # rising: only the peak and the trailing stop move
                 trough = min(trough, p0)
+                if cfg.exit == "bracket" and cfg.tp and p1 >= cfg.tp:
+                    # resting take-profit limit: maker fill at the level, no slippage
+                    return (
+                        b,
+                        "take_profit",
+                        level_px(max(cfg.tp, p0)),
+                        max(peak, cfg.tp),
+                        trough,
+                        stop,
+                    )
                 peak = max(peak, p1)
                 t2, s2 = _tier(peak, cfg)
                 tier = max(tier, t2)
@@ -330,6 +390,8 @@ def _run_exit(j, sd, px, O, H, L, C, n, cfg: Cfg, ps=None, entry=None):
 
 
 def _tier(peak, cfg: Cfg):
+    if cfg.exit != "tiers":
+        return -1, None
     if peak >= cfg.th2:
         return 2, peak * (1 - cfg.trail2)
     if peak >= cfg.th1:

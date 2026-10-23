@@ -1,0 +1,28 @@
+{
+ "group": "C3_random_hold_only",
+ "net_usdt": -12103.328208839333,
+ "avg_net_pct": -0.09868494207799702,
+ "avg_gross_pct": -0.028627490137856103,
+ "cost_pct": 0.0700574519401409,
+ "is_avg_net_pct": -0.09673899289912116,
+ "oos_avg_net_pct": -0.10059975831382657,
+ "pos_months": 0,
+ "months": 12,
+ "pos_coins": 0,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 41295
+ },
+ "expectancy": {
+  "trades": 41295,
+  "win_rate": 0.35769463615449815,
+  "avg_win_pct": 0.4132737336682671,
+  "avg_loss_pct": 0.3837905671514425,
+  "payoff": 1.0768209774816864,
+  "breakeven_win_rate": 0.48150515178856723,
+  "expectancy_pct": -0.09868494207799702
+ },
+ "candidates": {
+  "random_entries": 46052
+ }
+}

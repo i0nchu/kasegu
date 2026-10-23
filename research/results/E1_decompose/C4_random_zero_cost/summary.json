@@ -1,0 +1,32 @@
+{
+ "group": "C4_random_zero_cost",
+ "net_usdt": 546.6112416136649,
+ "avg_net_pct": 0.0043714921045939535,
+ "avg_gross_pct": 0.004398049193499205,
+ "cost_pct": 2.6557088905251657e-05,
+ "is_avg_net_pct": 0.012133548005134265,
+ "oos_avg_net_pct": -0.003322646265718862,
+ "pos_months": 6,
+ "months": 12,
+ "pos_coins": 17,
+ "coins": 28,
+ "exit_reasons": {
+  "max_hold": 21021,
+  "trail_t0": 12357,
+  "stop_loss": 6257,
+  "trail_t1": 2304,
+  "trail_t2": 162
+ },
+ "expectancy": {
+  "trades": 42101,
+  "win_rate": 0.5595354029595496,
+  "avg_win_pct": 0.2609251033660125,
+  "avg_loss_pct": 0.3215362635298558,
+  "payoff": 0.8114951032320641,
+  "breakeven_win_rate": 0.5520301977166834,
+  "expectancy_pct": 0.0043714921045939215
+ },
+ "candidates": {
+  "random_entries": 46052
+ }
+}

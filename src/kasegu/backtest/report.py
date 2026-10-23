@@ -190,3 +190,40 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def candidates(journal) -> list[dict]:
+    """Every entry signal with its order outcome: filled, expired or rejected (and why)."""
+    orders = {}
+    for ts, sym, purpose, status, data in journal.db.execute(
+        "SELECT ts, symbol, purpose, status, data FROM orders"
+    ):
+        if purpose == "entry":
+            o = json.loads(data)
+            orders[(sym, ts)] = (status, o.get("avg_price") or None, o.get("reason") or "")
+    out = []
+    for ts, sym, data in journal.db.execute(
+        "SELECT ts, symbol, data FROM events WHERE kind = 'signal' ORDER BY id"
+    ):
+        d = json.loads(data)
+        status, fill_px, why = orders.get((sym, ts), (None, None, ""))
+        if not d.get("ok"):
+            outcome = f"rejected:{d.get('reason')}"
+        elif status == "FILLED" or (fill_px and status == "CANCELED"):
+            outcome = "filled"
+        elif status == "REJECTED":
+            outcome = f"rejected:{why}"
+        else:
+            outcome = "expired"
+        out.append(
+            {
+                "ts": ts,
+                "symbol": sym,
+                "side": d.get("side"),
+                "price": d.get("price"),
+                "distance_pct": d.get("distance_pct"),
+                "outcome": outcome,
+                "fill_price": fill_px,
+            }
+        )
+    return out

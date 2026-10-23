@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import gzip
 import json
 import logging
 import signal
@@ -10,7 +12,7 @@ from pathlib import Path
 
 from kasegu.backtest.data import Archive
 from kasegu.backtest.replay import Replay
-from kasegu.backtest.report import run_name
+from kasegu.backtest.report import candidates, run_name
 from kasegu.config import AppConfig, Secrets
 from kasegu.core.engine import Engine
 from kasegu.core.execution import PaperBroker
@@ -319,6 +321,14 @@ async def run_backtest(cfg: AppConfig, label: str = "") -> dict:
         "trades": [asdict(t) for t in replay.engine.trades],
     }
     bt.out_dir.mkdir(parents=True, exist_ok=True)
+    # every candidate order with its outcome, too large for the json report
+    cand = out.with_suffix(".candidates.csv.gz")
+    rows = candidates(replay.journal)
+    with gzip.open(cand, "wt", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ["ts"])
+        w.writeheader()
+        w.writerows(rows)
+    report["candidates_file"] = str(cand)
     out.write_text(json.dumps(report, indent=2, default=str))
     log.info("backtest done in %.0fs, saved to %s", report["elapsed_s"], out)
     return report
