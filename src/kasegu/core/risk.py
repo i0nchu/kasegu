@@ -27,6 +27,15 @@ class RiskManager:
         notional = c.margin_budget * c.leverage * (1 - c.cost_reserve_pct / 100)
         return self.rules[symbol].qty(notional / price)
 
+    def untradable(self, prices: dict[str, float]) -> dict[str, str]:
+        """Symbols whose sized order fails min qty / min notional at these prices."""
+        out = {}
+        for s, px in prices.items():
+            err = self.rules[s].valid(px, self.size(s, px))
+            if err:
+                out[s] = err
+        return out
+
     def check(
         self,
         sig: Signal,

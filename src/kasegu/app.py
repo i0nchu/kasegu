@@ -75,6 +75,7 @@ async def run_paper(cfg: AppConfig):
     )
     # paper positions do not survive a restart, sync resets local state
     eng.restore()
+    eng.check_sizes()
     await eng.sync()
     eng.alert("started", None, f"paper {cfg.strategy.id} k={cfg.strategy.k} {cfg.symbols}")
     try:
@@ -123,6 +124,7 @@ async def run_live(cfg: AppConfig):
         events=bus,
     )
     eng.restore()
+    eng.check_sizes()
     # stream first so no fill between sync and subscribe is missed
     await broker.connect()
     await eng.sync()
