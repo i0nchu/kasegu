@@ -1,0 +1,30 @@
+{
+ "group": "D_drop",
+ "net_usdt": 835.7643287436192,
+ "avg_net_pct": 0.2622573447251701,
+ "avg_gross_pct": 0.33230864536658594,
+ "cost_pct": 0.0700513006414158,
+ "is_avg_net_pct": 0.2789140676887897,
+ "oos_avg_net_pct": 0.23261183002048968,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 22,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 351,
+  "trail_t1": 324,
+  "max_hold": 168,
+  "trail_t2": 120,
+  "stop_loss": 110
+ },
+ "expectancy": {
+  "trades": 1073,
+  "win_rate": 0.8164026095060578,
+  "avg_win_pct": 0.777133556635697,
+  "avg_loss_pct": 2.027242968135854,
+  "payoff": 0.383345049829083,
+  "breakeven_win_rate": 0.7228854436017632,
+  "expectancy_pct": 0.2622573447251701
+ },
+ "candidates": {}
+}

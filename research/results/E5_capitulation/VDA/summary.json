@@ -1,0 +1,35 @@
+{
+ "group": "VDA",
+ "net_usdt": 873.9719619745812,
+ "avg_net_pct": 0.414460075864078,
+ "avg_gross_pct": 0.4846185922024327,
+ "cost_pct": 0.07015851633835474,
+ "is_avg_net_pct": 0.39992362918447955,
+ "oos_avg_net_pct": 0.4488377388646449,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 24,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t1": 282,
+  "trail_t0": 183,
+  "trail_t2": 117,
+  "stop_loss": 94,
+  "max_hold": 34
+ },
+ "expectancy": {
+  "trades": 710,
+  "win_rate": 0.847887323943662,
+  "avg_win_pct": 0.9998659361648103,
+  "avg_loss_pct": 2.8486355528492635,
+  "payoff": 0.3509981946145143,
+  "breakeven_win_rate": 0.7401934391817111,
+  "expectancy_pct": 0.41446007586407796
+ },
+ "candidates": {
+  "rejected:filter": 11975220,
+  "expired": 2952153,
+  "rejected:in_position": 2948,
+  "filled": 710
+ }
+}

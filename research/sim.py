@@ -208,6 +208,17 @@ def signals(df: pd.DataFrame, cfg: Cfg) -> pd.DataFrame:
             "atr_ratio": atr_pct / pd.Series(atr_pct).rolling(1440).mean().to_numpy(),
         }
     )
+    # optional filters known at the bar close (cfg.extra), the order is simply not placed
+    f = cfg.extra
+    block = np.zeros(len(out), bool)
+    if "min_vol_ratio" in f:
+        block |= ~(out.vol_ratio.to_numpy() >= f["min_vol_ratio"])
+    if "max_ret60" in f:
+        block |= ~(out.ret60.to_numpy() * np.sign(out.want.to_numpy()) <= f["max_ret60"])
+    if "min_atr_pct" in f:
+        block |= ~(out.atr_pct.to_numpy() >= f["min_atr_pct"])
+    out["filtered"] = block & (out.want.to_numpy() != 0)
+    out.loc[block, "side"] = 0
     return out
 
 
@@ -296,7 +307,11 @@ def simulate(
                 "mfe": peak,
                 "mae": trough,
                 "hold": x - j + 1,
-                **{k: sg[k] for k in sig.columns if k not in ("t", "side", "want", "limit")},
+                **{
+                    k: sg[k]
+                    for k in sig.columns
+                    if k not in ("t", "side", "want", "limit", "filtered")
+                },
             }
         )
     tr = pd.DataFrame(rows)
@@ -311,6 +326,7 @@ def _candidates(sig: pd.DataFrame, spans, live) -> pd.DataFrame:
     n = len(want)
     out = np.full(n, "expired", dtype=object)
     out[(want != 0) & (sig.side.to_numpy() == 0)] = "rejected:post_only"
+    out[sig.filtered.to_numpy()] = "rejected:filter"
     trade_id = np.full(n, -1)
     for k, (j, x) in enumerate(spans):
         out[j:x] = "rejected:in_position"  # bar closes while the position is open

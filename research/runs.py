@@ -50,7 +50,8 @@ def _one(args):
     if control:
         # random bars where the strategy had a direction, same side, entered at the open
         sig = signals(df, cfg)
-        ok = np.flatnonzero(sig.want.to_numpy()[:-1] != 0) + 1
+        live = (sig.want.to_numpy() != 0) & ~sig.filtered.to_numpy()
+        ok = np.flatnonzero(live[:-1]) + 1
         rng = np.random.default_rng(seed + hash(symbol) % 10_000)
         pick = np.sort(rng.choice(ok, size=min(n_ctrl.get(symbol, 0), len(ok)), replace=False))
         entries = np.c_[pick, sig.want.to_numpy()[pick - 1]]

@@ -1,0 +1,30 @@
+{
+ "group": "VDA_k8",
+ "net_usdt": 1067.5778538305794,
+ "avg_net_pct": 0.1710056245664029,
+ "avg_gross_pct": 0.24042955437689295,
+ "cost_pct": 0.06942392981049006,
+ "is_avg_net_pct": 0.23826192746503658,
+ "oos_avg_net_pct": 0.020094105408048995,
+ "pos_months": 18,
+ "months": 24,
+ "pos_coins": 23,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t0": 804,
+  "trail_t1": 633,
+  "stop_loss": 243,
+  "trail_t2": 216,
+  "max_hold": 206
+ },
+ "expectancy": {
+  "trades": 2102,
+  "win_rate": 0.8273073263558516,
+  "avg_win_pct": 0.6990945156227534,
+  "avg_loss_pct": 2.358874765370218,
+  "payoff": 0.2963677961568395,
+  "breakeven_win_rate": 0.7713860240624306,
+  "expectancy_pct": 0.171005624566403
+ },
+ "candidates": {}
+}

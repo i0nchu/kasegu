@@ -1,0 +1,30 @@
+{
+ "group": "A_atr",
+ "net_usdt": 909.2414666459632,
+ "avg_net_pct": 0.3182348315609187,
+ "avg_gross_pct": 0.38837147883879963,
+ "cost_pct": 0.07013664727788094,
+ "is_avg_net_pct": 0.2956027945175551,
+ "oos_avg_net_pct": 0.3667531854839466,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 24,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t1": 357,
+  "trail_t0": 285,
+  "trail_t2": 125,
+  "stop_loss": 116,
+  "max_hold": 79
+ },
+ "expectancy": {
+  "trades": 962,
+  "win_rate": 0.8440748440748441,
+  "avg_win_pct": 0.8590994209806937,
+  "avg_loss_pct": 2.609645479164797,
+  "payoff": 0.32920158229908064,
+  "breakeven_win_rate": 0.7523313343265283,
+  "expectancy_pct": 0.3182348315609188
+ },
+ "candidates": {}
+}

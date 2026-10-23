@@ -1,0 +1,30 @@
+{
+ "group": "VD",
+ "net_usdt": 832.4615242522079,
+ "avg_net_pct": 0.31599783033347684,
+ "avg_gross_pct": 0.38606034867015687,
+ "cost_pct": 0.07006251833668006,
+ "is_avg_net_pct": 0.32611427428121503,
+ "oos_avg_net_pct": 0.295901190841337,
+ "pos_months": 21,
+ "months": 24,
+ "pos_coins": 23,
+ "coins": 28,
+ "exit_reasons": {
+  "trail_t1": 285,
+  "trail_t0": 267,
+  "max_hold": 118,
+  "trail_t2": 118,
+  "stop_loss": 99
+ },
+ "expectancy": {
+  "trades": 887,
+  "win_rate": 0.8196166854565953,
+  "avg_win_pct": 0.8618431847400784,
+  "avg_loss_pct": 2.1641869987515188,
+  "payoff": 0.3982295361894607,
+  "breakeven_win_rate": 0.715190155920508,
+  "expectancy_pct": 0.31599783033347695
+ },
+ "candidates": {}
+}
