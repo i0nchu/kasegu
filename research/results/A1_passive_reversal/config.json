@@ -1,0 +1,214 @@
+{
+ "exp": "A1_passive_reversal",
+ "rules": [
+  {
+   "name": "L_dn_k3",
+   "side": 1,
+   "trend": "down",
+   "k": 3
+  },
+  {
+   "name": "L_dn_k6",
+   "side": 1,
+   "trend": "down",
+   "k": 6
+  },
+  {
+   "name": "L_dn_k9",
+   "side": 1,
+   "trend": "down",
+   "k": 9
+  },
+  {
+   "name": "L_dn_k12",
+   "side": 1,
+   "trend": "down",
+   "k": 12
+  },
+  {
+   "name": "L_dn_k15",
+   "side": 1,
+   "trend": "down",
+   "k": 15
+  },
+  {
+   "name": "L_dn_k20",
+   "side": 1,
+   "trend": "down",
+   "k": 20
+  },
+  {
+   "name": "L_up_k3",
+   "side": 1,
+   "trend": "up",
+   "k": 3
+  },
+  {
+   "name": "L_up_k6",
+   "side": 1,
+   "trend": "up",
+   "k": 6
+  },
+  {
+   "name": "L_up_k9",
+   "side": 1,
+   "trend": "up",
+   "k": 9
+  },
+  {
+   "name": "L_up_k12",
+   "side": 1,
+   "trend": "up",
+   "k": 12
+  },
+  {
+   "name": "L_up_k15",
+   "side": 1,
+   "trend": "up",
+   "k": 15
+  },
+  {
+   "name": "L_up_k20",
+   "side": 1,
+   "trend": "up",
+   "k": 20
+  },
+  {
+   "name": "S_up_k3",
+   "side": -1,
+   "trend": "up",
+   "k": 3
+  },
+  {
+   "name": "S_up_k6",
+   "side": -1,
+   "trend": "up",
+   "k": 6
+  },
+  {
+   "name": "S_up_k9",
+   "side": -1,
+   "trend": "up",
+   "k": 9
+  },
+  {
+   "name": "S_up_k12",
+   "side": -1,
+   "trend": "up",
+   "k": 12
+  },
+  {
+   "name": "S_up_k15",
+   "side": -1,
+   "trend": "up",
+   "k": 15
+  },
+  {
+   "name": "S_up_k20",
+   "side": -1,
+   "trend": "up",
+   "k": 20
+  },
+  {
+   "name": "S_dn_k3",
+   "side": -1,
+   "trend": "down",
+   "k": 3
+  },
+  {
+   "name": "S_dn_k6",
+   "side": -1,
+   "trend": "down",
+   "k": 6
+  },
+  {
+   "name": "S_dn_k9",
+   "side": -1,
+   "trend": "down",
+   "k": 9
+  },
+  {
+   "name": "S_dn_k12",
+   "side": -1,
+   "trend": "down",
+   "k": 12
+  },
+  {
+   "name": "S_dn_k15",
+   "side": -1,
+   "trend": "down",
+   "k": 15
+  },
+  {
+   "name": "S_dn_k20",
+   "side": -1,
+   "trend": "down",
+   "k": 20
+  },
+  {
+   "name": "L_dn_fixed_k12",
+   "side": 1,
+   "trend": "down",
+   "k": 12,
+   "fixed": true
+  }
+ ],
+ "cost_pct": 0.09000000000000001,
+ "horizons_min": [
+  1,
+  5,
+  15,
+  30,
+  60,
+  240
+ ],
+ "symbols": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "BNBUSDT",
+  "XRPUSDT",
+  "DOGEUSDT",
+  "ADAUSDT",
+  "AVAXUSDT",
+  "LINKUSDT",
+  "DOTUSDT",
+  "LTCUSDT",
+  "BCHUSDT",
+  "TRXUSDT",
+  "SUIUSDT",
+  "1000PEPEUSDT",
+  "WIFUSDT",
+  "ARBUSDT",
+  "OPUSDT",
+  "APTUSDT",
+  "NEARUSDT",
+  "TIAUSDT",
+  "INJUSDT",
+  "SEIUSDT",
+  "ENAUSDT",
+  "1000BONKUSDT",
+  "FETUSDT",
+  "ORDIUSDT",
+  "WLDUSDT",
+  "1000FLOKIUSDT",
+  "AAVEUSDT",
+  "ATOMUSDT",
+  "CRVUSDT",
+  "ETCUSDT",
+  "FILUSDT",
+  "HBARUSDT",
+  "JUPUSDT",
+  "ONDOUSDT",
+  "PENDLEUSDT",
+  "UNIUSDT",
+  "XLMUSDT"
+ ],
+ "period": [
+  "2024-10-01 00:00:00",
+  "2026-09-30 23:59:00"
+ ],
+ "year2_from": "2025-10-01 00:00:00",
+ "fill_rule": "bar after the order trades through the limit by more than half a tick",
+ "features_at": "close of the bar the order was placed in (before it can fill)"
+}
