@@ -1,0 +1,239 @@
+<title>kasegu 第二輪驗證</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; decision first, then one section per experiment (claim, chart, group table with settings snapshot), trade browser and appendix last */
+:root{
+  --bg:#f6f7f9; --paper:#ffffff; --ink:#18202b; --muted:#5b6675; --rule:#dde2e8;
+  --loss:#c2412d; --loss-soft:#f6ded8; --gain:#1f7a55; --gain-soft:#d9efe5; --accent:#2b5c8a; --accent-soft:#e1ebf4;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161c; --paper:#1a2029; --ink:#e7ebf0; --muted:#9aa5b3; --rule:#2c3440;
+  --loss:#f07a64; --loss-soft:#3a2420; --gain:#5cc79a; --gain-soft:#1c3329; --accent:#7fb0de; --accent-soft:#1d2b3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161c; --paper:#1a2029; --ink:#e7ebf0; --muted:#9aa5b3; --rule:#2c3440;
+  --loss:#f07a64; --loss-soft:#3a2420; --gain:#5cc79a; --gain-soft:#1c3329; --accent:#7fb0de; --accent-soft:#1d2b3a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.75}
+.wrap{max-width:820px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 72px;display:flex;flex-direction:column;gap:44px}
+h1{font-size:clamp(26px,5.5vw,38px);font-weight:900;line-height:1.3;margin:0;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:0;text-wrap:balance}
+p{margin:0}
+section{display:flex;flex-direction:column;gap:14px;min-width:0}
+.eyebrow{font-size:12px;letter-spacing:.1em;color:var(--muted);font-weight:500}
+.eyebrow code{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;letter-spacing:0}
+.lede{font-size:18px;color:var(--muted)}
+.verdict{background:var(--paper);border:1px solid var(--rule);border-left:6px solid var(--accent);border-radius:6px;padding:20px 22px;display:flex;flex-direction:column;gap:10px}
+.verdict.no{border-left-color:var(--loss)} .verdict.yes{border-left-color:var(--gain)}
+.verdict strong{font-size:18px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:600}
+.stat .k{font-size:13px;color:var(--muted);line-height:1.5}
+.loss{color:var(--loss)} .gain{color:var(--gain)}
+figure{margin:0;background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+figcaption{font-size:13px;color:var(--muted);line-height:1.6}
+svg text{font-family:var(--sans);fill:var(--muted);font-size:12px}
+svg .val{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px}
+.note{font-size:14px;color:var(--muted)}
+.tbl{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:12px;white-space:nowrap;background:var(--paper);position:sticky;top:0}
+td.r,th.r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.groups td:first-child{min-width:220px}
+.sub{color:var(--muted);font-size:12px}
+.snap{font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:2px;word-break:break-all}
+td.small{font-size:11px;font-family:var(--mono);color:var(--muted);min-width:150px}
+.callout{background:var(--accent-soft);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+hr{border:0;border-top:1px solid var(--rule);margin:0}
+code{font-family:var(--mono);font-size:.88em}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+select,input{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink)}
+button{font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#browser .tbl{max-height:520px}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:12px">
+  <div class="eyebrow">KASEGU 第二輪驗證 · 5 個實驗、5 次提交 · 分支 feat/strategy-research</div>
+  <h1>放棄調整原策略，改往「投降式拋售」這個新因子發展</h1>
+  <p class="lede">第一輪留下兩個問題：原策略虧錢，到底是進場、出場，還是期望值本身的問題？「下跌中接極端急殺」的線索，能不能撐過沒看過的資料和真實成交？這一輪用 5 個實驗回答。</p>
+</header>
+
+<section>
+  <div class="verdict no">
+    <strong>原策略（EMA + ATR 插針）：不值得再優化。</strong>
+    <p>問題出在進場。把手續費、滑價全部歸零，原策略的進場每筆仍是 −0.009%，比隨機挑時間進場（+0.004%）還差。換了四種出場方式，每筆都落在 −0.110% 到 −0.116% 之間。出場只能在「勝率高、賺得少」和「勝率低、賺得多」之間互換，改變不了期望值，最後扣掉的就是成本。</p>
+  </div>
+  <div class="verdict yes">
+    <strong>投降式拋售（下跌中的極端急殺做多）：通過了這輪所有檢查，值得當成新策略繼續做。</strong>
+    <p>它在完全沒看過的 2024–25 年、12 個新幣種、參數鄰近區都成立。同條件下隨機進場的對照組全部虧損，正式引擎逐筆重播也是賺的。不過真實成交的獲利大約只有模擬的一半，而且很依賴在針尖成交、停損不要滑太多。</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="v loss">−0.009%</span><span class="k">原策略進場在零成本下每筆損益（隨機進場 +0.004%）</span></div>
+    <div class="stat"><span class="v gain">+0.16%</span><span class="k">新因子在未看過的 2024-10～2025-09 每筆淨利（對照組 −0.08%）</span></div>
+    <div class="stat"><span class="v gain">+0.26%</span><span class="k">加上投降條件後，正式引擎逐筆重播的每筆淨利</span></div>
+    <div class="stat"><span class="v">≈ 1</span><span class="k">每個幣每月出手次數，機會很少</span></div>
+  </div>
+</section>
+
+<section class="callout">
+  <p><b>怎麼讀這份報告：</b>每個實驗都有實驗組和對照組，表格第一欄是該組的設定快照（只列出和引擎現行設定不同的地方）。「候選訂單結果」是每一分鐘策略想掛的單後來怎麼了：<code>filled</code> 成交、<code>expired</code> 沒成交被撤掉、<code>rejected:in_position</code> 已有倉位所以不下單、<code>rejected:filter</code> 被條件擋掉，正式引擎另有 <code>rejected:stale_data</code>（10 秒內沒有成交資料）與 <code>rejected:spread</code>（價差太大）。逐筆成交可以在最下方的交易瀏覽器查。完整紀錄在你電腦的 <code>data/research/runs/&lt;實驗&gt;/&lt;組別&gt;/</code>：<code>trades.csv</code> 是每筆交易，<code>candidates/*.csv.gz</code> 是每一筆候選訂單。</p>
+  <p class="note">金額一律以每筆 30 USDT 保證金 × 10 倍（約 297 USDT 部位）換算。手續費掛單 0.02%、吃單 0.05%，出場滑價 0.02%，停損與移動停利另加 0.03%，和正式回測一致。</p>
+</section>
+
+<hr>
+
+<section>
+  <div class="eyebrow">E1 · 原策略為什麼虧：進場、出場還是期望值 · 提交 <code>{{C_E1_decompose}}</code></div>
+  <h2>換出場沒用，問題在進場沒有優勢</h2>
+  <p>我把同一批進場訊號接上四種出場方式，再做兩組對照：同一個幣、同一個趨勢方向、同樣筆數，但在隨機的分鐘進場。期間是 2025-10～2026-09，28 個幣。如果進場有優勢，它應該贏過隨機進場；如果出場有優勢，隨機進場配上它也應該賺。</p>
+  <figure>
+    <div style="overflow-x:auto">{{CHART_E1}}</div>
+    <figcaption>每筆平均淨損益。深色是原策略進場，淺色是隨機進場對照組。成本歸零後，原策略比隨機還差；加上成本後，不管配哪種出場都約 −0.11%。</figcaption>
+  </figure>
+  <p><b>期望值算給你看：</b>現行出場勝率 46.3%、盈虧比 0.53，要打平需要 65.3% 的勝率。改成固定停利停損後，勝率變成 37.6%、盈虧比 0.92，打平勝率降到 52.1%，但實際勝率也一起掉。每一組實際勝率都比打平勝率低大約 15 到 20 個百分點，差距剛好就是成本。出場只是在重新分配同一個零優勢的價格走勢。</p>
+  {{GROUPS_E1_decompose}}
+</section>
+
+<section>
+  <div class="eyebrow">E2 · 新因子在沒看過的資料上 · 提交 <code>{{C_E2_holdout}}</code></div>
+  <h2>2024-25 年與 12 個新幣種都成立，對照組都虧</h2>
+  <p>第一輪的線索是只用 2025-10～2026-09 找出來的。這裡把同一組設定（只做多、價格在 240 均線下、k=12、停損 3%、現行移動停利、30 分鐘）直接套到研究前那一整年，再套到從沒用過的 12 個幣種，不改任何參數。</p>
+  <ul>
+    <li>未看過的 2024-10～2025-09：每筆 <b class="gain">+0.16%</b>，12 個月有 10 個月賺，28 個幣有 20 個賺。同方向隨機進場的對照組每筆 −0.08%。</li>
+    <li>12 個新幣、24 個月：每筆 <b class="gain">+0.09%</b>，24 個月有 18 個月賺。對照組 −0.05%。</li>
+    <li>如果多空都做，每筆只剩 +0.008%：放空「上漲中的極端急拉」沒有優勢，第一輪看到的現象再次出現。</li>
+    <li>原策略在同一年也是 0/12 個月、0/28 個幣賺錢，和第一輪一致。</li>
+  </ul>
+  {{GROUPS_E2_holdout}}
+</section>
+
+<section>
+  <div class="eyebrow">E3 · 新因子有多脆弱 · 提交 <code>{{C_E3_robust}}</code></div>
+  <h2>參數怎麼動都還賺，怕的是成交和滑價</h2>
+  <p>這裡用 24 個月、28 個幣，以第一列為基準，每組只改一個條件。</p>
+  <figure>
+    <div style="overflow-x:auto">{{CHART_E3}}</div>
+    <figcaption>每筆平均淨損益（24 個月）。淺色是隨機進場對照組。</figcaption>
+  </figure>
+  <ul>
+    <li><b>參數鄰近區很平穩：</b>k 10～15、停損 2～5%、持倉 15～60 分、均線 120～480 都賺錢。這代表優勢不是剛好挑中某個數字。</li>
+    <li><b>成交是最大缺口：</b>如果價格要多穿過掛單價 0.2% 才算成交（模擬排隊排不到），獲利少一半；要穿過 0.5% 就歸零。獲利有很大一部分來自剛好掛在針尖附近的單。</li>
+    <li><b>停損滑價是第二個缺口：</b>停損和移動停利出場時多滑 0.1% 還撐得住，多滑 0.3% 就變成虧損。急殺行情裡停損單滑價本來就大。</li>
+    <li><b>出場在這裡很重要：</b>固定 +1% 停利會把優勢吃光，因為獲利靠少數大反彈。不用移動停利、只靠時間出場，平均更高但比較不穩（24 個月中 16 個月賺）。現行三段移動停利是最穩的選擇。</li>
+  </ul>
+  {{GROUPS_E3_robust}}
+</section>
+
+<section>
+  <div class="eyebrow">E5 · 什麼樣的急殺會反彈 · 提交 <code>{{C_E5_capitulation}}</code></div>
+  <h2>「已經跌一段 + 量放大 + 幣種本來就會動」的急殺最好</h2>
+  <p>我把第一年的交易依下單前的條件分成三等份，每個條件都在最差那一等份畫一條門檻，門檻只用第一年資料決定。之後在第二年檢查：下單前 5 分鐘成交量至少是 4 小時平均的 1.07 倍、下單前 60 分鐘至少跌了 0.26%、該幣平均每分鐘波動至少 0.081%。</p>
+  <figure>
+    <div style="overflow-x:auto">{{CHART_E5}}</div>
+    <figcaption>第二年（2025-10～2026-09，門檻沒看過的期間）每筆平均淨損益。最後一列是對照組：同樣三個條件成立的時段，但隨機進場。</figcaption>
+  </figure>
+  <p>三個條件都加上後，每筆從 +0.18% 提高到 <b class="gain">+0.41%</b>（第二年 +0.39%），交易筆數少一半，總獲利差不多，但每筆品質好很多。同樣條件下隨機進場是 −0.12%，所以賺的是「急殺那一刻」的時機，不是因為挑到會漲的時段。</p>
+  <p><b>這個因子怎麼解釋：</b>它正好是原策略失敗原因的反面。一般程度的急跌，背後有真實賣壓，量越大越容易繼續跌。可是當價格已經跌了一段、成交量放大，又突然殺到平常波動的 12 倍，通常是連環爆倉或恐慌拋售，賣完就沒有人賣了，價格會快速修正。這就是交易上說的「投降式拋售（capitulation）」。</p>
+  {{GROUPS_E5_capitulation}}
+</section>
+
+<section>
+  <div class="eyebrow">E4 · 正式引擎逐筆重播 · 提交 <code>{{C_E4_engine}}</code></div>
+  <h2>真實成交下仍然賺錢，但大約只有模擬的一半</h2>
+  <p>從新因子的交易日中，隨機抽 200 個「幣種 × 日期」（BTC、ETH 的逐筆資料太大，所以排除），下載逐筆成交，用正式回測引擎重跑。引擎用的是同一組設定（<code>direction: against, sides: long</code>）。</p>
+  <div class="stats" id="e4stats"></div>
+  <ul>
+    <li><b>成交幾乎一致：</b>模擬 225 筆、引擎 224 筆，其中 216 筆在同一分鐘進場，進場價差異最大只有 0.04%。</li>
+    <li><b>差距來自大反彈的出場：</b>15 筆模擬判定為「第三段移動停利」的大賺單，模擬平均 +6.2%，引擎只有 +2.2%。1 分 K 只知道每分鐘的高低點，會以為移動停利跟到了最高點附近；逐筆成交裡，反彈途中的小回檔就會先觸發停利。所以模擬高估了大反彈能賺到的部分。</li>
+    <li><b>停損滑價：</b>7 筆停損在引擎裡平均 −3.48%，比設定的 −3% 多滑了約 0.4%。這和 E3 的壓力測試一致，是要盯緊的風險。</li>
+    <li><b>投降條件在引擎裡也成立：</b>符合三個條件的 117 筆每筆 <b class="gain">+0.26%</b>，不符合的 99 筆每筆 +0.03%，約打平。</li>
+    <li><b>被拒絕的候選訂單：</b>引擎有 9,954 次因為 10 秒內沒有成交資料而不下單（<code>stale_data</code>），447 次因為價差超過 0.05%（<code>spread</code>）。這些是冷門幣在實盤也會遇到的情況，快速模擬器沒有模擬這兩種拒單。</li>
+  </ul>
+</section>
+
+<hr>
+
+<section>
+  <div class="eyebrow">結論與下一步</div>
+  <h2>換方向：以「投降式拋售」為核心，再補上從沒用過的資料因子</h2>
+  <p><b>不再搶救原策略。</b>E1 已經證明它的進場沒有資訊，調 k、EMA、停利參數都只是在重新分配成本。</p>
+  <p><b>新因子可以做，但要先補三個缺口：</b></p>
+  <ol>
+    <li><b>全量引擎驗證：</b>在引擎加入三個投降條件，把 24 個月的所有事件日都用逐筆資料重播，不再抽樣。確認校正後每筆仍在 +0.2% 左右。</li>
+    <li><b>成交與滑價的實測：</b>針尖成交率和急殺時的停損滑價，回測都只能估計。建議用正式網最小下單量跑 1 到 2 個月，記錄每一筆掛單有沒有成交、停損實際成交在哪裡，事先寫好停止條件。測試網的成交行為不能用。</li>
+    <li><b>直接量測「投降」：</b>目前是用價格、成交量間接推測。幣安公開資料還有強平（爆倉）紀錄、未平倉量與多空比，這些都是這個專案從沒用過的因子。「未平倉量突然大減 + 急殺」可能比現在的三個條件更準確地抓到投降，這是下一輪最值得做的實驗。</li>
+  </ol>
+  <p><b>獲利規模要有合理預期：</b>依正式引擎校正，每筆約 +0.25%（約 0.75 USDT），每個幣每月約 1 次機會。28 個幣全開，一個月大約 +20 USDT 等級；同期模擬的最大連續回落約 250 USDT。現在它是一個值得建設的因子，還不是能放大資金的策略。</p>
+</section>
+
+<section id="browser">
+  <div class="eyebrow">逐筆交易瀏覽器</div>
+  <h2>每一筆成交、出場原因與損益</h2>
+  <div class="controls">
+    <label for="ds">資料</label>
+    <select id="ds">
+      <option value="E5_capitulation/VDA">E5 實驗組：三個投降條件（模擬）</option>
+      <option value="E5_capitulation/VDA_ctrl">E5 對照組：同條件隨機進場（模擬）</option>
+      <option value="E4">E4 模擬 vs 正式引擎（逐筆對照）</option>
+    </select>
+    <label for="sym">幣種</label>
+    <input id="sym" placeholder="例如 WLD" size="10">
+    <span id="count" class="note"></span>
+    <button id="prev" type="button">上一頁</button><button id="next" type="button">下一頁</button>
+  </div>
+  <div class="tbl"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+  <p class="note">模擬組的時間是成交的那一分鐘（UTC）。side 1 代表做多。net 是扣掉手續費、滑價、資金費率之後的 %。vol_ratio、ret60、atr_pct 是下單前的三個條件值。E4 的 net_sim 是模擬損益，net_eng% 是正式引擎損益，net_diff% 是兩者差距。</p>
+</section>
+
+<section>
+  <div class="eyebrow">附錄</div>
+  <h2>檔案位置與重跑方式</h2>
+  <ul>
+    <li>每個實驗一支腳本：<code>research/e1_decompose.py</code>、<code>e2_holdout.py</code>、<code>e3_robust.py</code>、<code>e4_engine.py</code>、<code>e5_capitulation.py</code>，用 <code>PYTHONPATH=research uv run python research/&lt;腳本&gt;</code> 重跑。</li>
+    <li>可放進 git 的部分（每組設定快照 <code>config.json</code>、總結 <code>summary.json</code>、各幣統計與候選訂單結果 <code>by_symbol.csv</code>）在 <code>research/results/&lt;實驗&gt;/</code>。</li>
+    <li>完整逐筆交易與每一筆候選訂單（每組最多約 2 億字元）在你電腦的 <code>data/research/runs/</code>，太大所以不進 git。</li>
+    <li>正式引擎回測現在會在報告旁邊多輸出 <code>*.candidates.csv.gz</code>，裡面是每筆候選訂單的結果與拒絕原因。策略新增兩個研究參數：<code>params.direction: against</code>（反轉方向）、<code>params.sides: long|short</code>（只做單邊），預設行為不變。</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+const DATA = {{TRADES}};
+const E4 = {{E4}};
+const COLS = {
+  sim: ["symbol","time","side","entry","exit","reason","gross%","net%","mfe%","mae%","hold","vol_ratio","ret60","atr_pct"],
+  e4: ["symbol","time","match","reason_sim","reason_eng","entry_sim","entry_eng","exit_sim","exit_eng","net_sim%","net_eng%","net_diff%"]
+};
+const st = document.getElementById("e4stats");
+[["模擬 / 引擎筆數", E4.sim_trades + " / " + E4.engine_trades],
+ ["同一分鐘成交", E4.matched + " 筆"],
+ ["合計 USDT（模擬 → 引擎）", "+" + E4.sim_net_usdt_all.toFixed(0) + " → +" + E4.engine_net_usdt_all.toFixed(0)],
+ ["引擎每筆平均 / 勝率", "+" + E4["engine_avg%_all"].toFixed(2) + "% / " + (E4.engine_win_rate*100).toFixed(0) + "%"]
+].forEach(([k,v]) => { const d=document.createElement("div"); d.className="stat"; d.innerHTML='<span class="v">'+v+'</span><span class="k">'+k+'</span>'; st.appendChild(d); });
+let page = 0;
+function fmt(v){ if (v===null||v===undefined) return "–"; if (typeof v==="number") return Math.abs(v)>=100? v.toFixed(2): v.toFixed(Math.abs(v)<1?4:3); return v; }
+function render(){
+  const key = document.getElementById("ds").value, q = document.getElementById("sym").value.trim().toUpperCase();
+  const rows = (DATA[key]||[]).filter(r => !q || String(r[0]).includes(q));
+  const cols = key==="E4"? COLS.e4: COLS.sim;
+  document.getElementById("th").innerHTML = "<tr>"+cols.map((c,i)=>"<th"+(i>2?" class='r'":"")+">"+c+"</th>").join("")+"</tr>";
+  const n = 50, pages = Math.max(1, Math.ceil(rows.length/n)); page = Math.min(page, pages-1);
+  document.getElementById("tb").innerHTML = rows.slice(page*n, page*n+n).map(r => "<tr>"+r.map((v,i)=>{
+    const num = typeof v==="number"; const c = (num && (cols[i].startsWith("net")||cols[i].startsWith("gross")))? (v>0?" gain":" loss"):"";
+    return "<td class='"+(num?"r":"")+c+"'>"+fmt(v)+"</td>"; }).join("")+"</tr>").join("");
+  document.getElementById("count").textContent = rows.length + " 筆，第 " + (page+1) + " / " + pages + " 頁";
+}
+document.getElementById("ds").addEventListener("change", ()=>{page=0;render();});
+document.getElementById("sym").addEventListener("input", ()=>{page=0;render();});
+document.getElementById("prev").addEventListener("click", ()=>{page=Math.max(0,page-1);render();});
+document.getElementById("next").addEventListener("click", ()=>{page++;render();});
+render();
+</script>
