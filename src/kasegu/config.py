@@ -19,6 +19,8 @@ class StrategyConfig(BaseModel):
 
 
 class ExitConfig(BaseModel):
+    # trailing: fixed stop + 3 tier trailing + max hold; time_only: fixed stop + max hold
+    policy: Literal["trailing", "time_only"] = "trailing"
     # all values are unleveraged price return in %
     stop_loss_pct: float = Field(1.0, gt=0)
     low_threshold: float = 0.3

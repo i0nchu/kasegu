@@ -1,13 +1,12 @@
-from kasegu.config import ExitConfig
 from kasegu.core.position import Position
-from kasegu.core.types import Side
+from kasegu.exits.base import ExitPolicy, register
 
 
-class ExitManager:
+@register
+class TrailingExit(ExitPolicy):
     """Fixed stop, three tier trailing stop and max holding time."""
 
-    def __init__(self, cfg: ExitConfig):
-        self.cfg = cfg
+    id = "trailing"
 
     def tier_stop(self, peak: float) -> tuple[int, float | None]:
         c = self.cfg
@@ -20,12 +19,9 @@ class ExitManager:
         return -1, None
 
     def update(self, pos: Position, price: float, now: int) -> str | None:
-        """Update peak / tier from a mark price. Returns exit reason or None."""
         if not pos.has_qty:
             return None
-        p = pos.profit_pct(price)
-        pos.peak_pct = max(pos.peak_pct, p)
-        pos.trough_pct = min(pos.trough_pct, p)
+        p = self.track(pos, price)
 
         tier, stop = self.tier_stop(pos.peak_pct)
         pos.tier = max(pos.tier, tier)
@@ -37,14 +33,10 @@ class ExitManager:
             return "stop_loss"
         if pos.stop_pct is not None and p < pos.stop_pct:
             return f"trail_t{pos.tier}"
-        held = now - (pos.open_time or now)
-        if held >= self.cfg.max_holding_minutes * 60_000:
+        if self.timed_out(pos, now):
             return "max_hold"
         return None
 
-    def stop_price(self, pos: Position) -> float:
-        """Exchange side protective stop price."""
-        sl = self.cfg.stop_loss_pct / 100
-        if pos.side is Side.BUY:
-            return pos.entry_price * (1 - sl)
-        return pos.entry_price * (1 + sl)
+
+# original name, kept for existing imports
+ExitManager = TrailingExit

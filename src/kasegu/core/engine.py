@@ -21,7 +21,7 @@ from kasegu.core.types import (
 )
 from kasegu.events import Event, EventBus
 from kasegu.exchange.rules import SymbolRules
-from kasegu.exits.trailing import ExitManager
+from kasegu.exits import create_exit
 from kasegu.market.data import MINUTE, MarketData
 from kasegu.storage.journal import Journal
 from kasegu.strategies.base import Strategy
@@ -63,7 +63,8 @@ class Engine:
         self.clock = clock
         self.exec = Execution(broker)
         self.risk = RiskManager(cfg.risk, rules)
-        self.exits = ExitManager(cfg.exit)
+        strategy.check_exit(cfg.exit)
+        self.exits = create_exit(cfg.exit)
         self.positions = PositionManager(cfg.symbols)
         self.entry: dict[str, Order | None] = dict.fromkeys(cfg.symbols)
         self.stop: dict[str, Order | None] = dict.fromkeys(cfg.symbols)
