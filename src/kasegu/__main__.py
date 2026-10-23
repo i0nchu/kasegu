@@ -79,6 +79,14 @@ def main(argv: list[str] | None = None) -> int:
             log.error("--k must be > 0")
             return 2
         cfg.strategy.k = args.k
+    from kasegu.strategies import create
+
+    try:
+        # frozen strategies refuse other parameters or exits before anything starts
+        create(cfg.strategy).check_exit(cfg.exit)
+    except ValueError as e:
+        log.error("%s", e)
+        return 2
     log.info("mode=%s strategy=%s symbols=%s", cfg.mode, cfg.strategy.id, cfg.symbols)
 
     if cfg.mode == "paper":

@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import numpy as np
 
-from kasegu.config import StrategyConfig
+from kasegu.config import ExitConfig, StrategyConfig
 from kasegu.core.types import Signal
 
 
@@ -38,6 +38,9 @@ class Strategy(ABC):
     @abstractmethod
     def on_bar(self, s: MarketState) -> Signal | None:
         """Return a candidate entry or None."""
+
+    def check_exit(self, cfg: ExitConfig):  # noqa: B027
+        """Raise ValueError if the strategy cannot run with this exit policy."""
 
 
 _registry: dict[str, type[Strategy]] = {}

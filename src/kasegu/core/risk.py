@@ -20,11 +20,21 @@ class RiskManager:
     def __init__(self, cfg: RiskConfig, rules: dict[str, SymbolRules]):
         self.cfg = cfg
         self.rules = rules
+        self.stop_loss_pct = 0.0  # set by the engine from the exit config
 
     def size(self, symbol: str, price: float) -> float:
         c = self.cfg
         notional = c.margin_budget * c.leverage * (1 - c.cost_reserve_pct / 100)
         return self.rules[symbol].qty(notional / price)
+
+    def untradable(self, prices: dict[str, float]) -> dict[str, str]:
+        """Symbols whose sized order fails min qty / min notional at these prices."""
+        out = {}
+        for s, px in prices.items():
+            err = self.rules[s].valid(px, self.size(s, px))
+            if err:
+                out[s] = err
+        return out
 
     def check(
         self,
@@ -64,4 +74,7 @@ class RiskManager:
             return None, err
         if exposure + price * qty > c.max_notional:
             return None, "max_notional"
+        if c.max_loss_per_trade and price * qty * self.stop_loss_pct / 100 > c.max_loss_per_trade:
+            # more leverage means more notional, so it cannot get around this
+            return None, "max_loss_per_trade"
         return Plan(sig, price, qty), "ok"

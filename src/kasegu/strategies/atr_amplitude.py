@@ -8,9 +8,13 @@ from kasegu.strategies.distance import DistanceStrategy
 class AtrAmplitude(DistanceStrategy):
     id = "atr_amplitude"
 
+    def atr_base(self, s: MarketState, ref: float) -> float:
+        """Price the ATR is expressed against."""
+        return ref
+
     def distance_pct(self, s: MarketState, side: Side, ref: float):
         n = self.cfg.vol_period
-        atr_pct = ind.atr(s.high, s.low, s.close, n) / ref * 100
+        atr_pct = ind.atr(s.high, s.low, s.close, n) / self.atr_base(s, ref) * 100
         amp_pct = ind.amplitude_pct(s.high, s.low, s.close, n)
         dist = (atr_pct + amp_pct) / 2 * self.cfg.k
         return dist, {"atr_pct": atr_pct, "amp_pct": amp_pct, "k": self.cfg.k}

@@ -21,7 +21,7 @@ from kasegu.core.types import (
 )
 from kasegu.events import Event, EventBus
 from kasegu.exchange.rules import SymbolRules
-from kasegu.exits.trailing import ExitManager
+from kasegu.exits import create_exit
 from kasegu.market.data import MINUTE, MarketData
 from kasegu.storage.journal import Journal
 from kasegu.strategies.base import Strategy
@@ -63,7 +63,9 @@ class Engine:
         self.clock = clock
         self.exec = Execution(broker)
         self.risk = RiskManager(cfg.risk, rules)
-        self.exits = ExitManager(cfg.exit)
+        strategy.check_exit(cfg.exit)
+        self.exits = create_exit(cfg.exit)
+        self.risk.stop_loss_pct = cfg.exit.stop_loss_pct
         self.positions = PositionManager(cfg.symbols)
         self.entry: dict[str, Order | None] = dict.fromkeys(cfg.symbols)
         self.stop: dict[str, Order | None] = dict.fromkeys(cfg.symbols)
@@ -72,7 +74,8 @@ class Engine:
         self.charged: dict[str, int] = {}
         self.trades: list[Trade] = []
         self.halted = False  # blocks new entries only
-        self.blocked: set[str] = set()
+        # symbol -> why its state is not trusted; blocks new entries on all symbols until sync
+        self.blocked: dict[str, str] = {}
         self.pending: deque[tuple[Order, Fill | None]] = deque()
         self.events = events
         # loss circuit breakers
@@ -101,62 +104,112 @@ class Engine:
         if self.events is not None:
             self.events.publish(Event(kind, level, msg, s, self.clock(), data))
 
+    def block(self, s: str, kind: str, msg: str):
+        """Stop new entries everywhere until a sync confirms the exchange state."""
+        new = s not in self.blocked
+        self.blocked[s] = kind
+        if new:
+            self.alert(kind, s, f"{msg}, new entries blocked until reconciled", "critical")
+
     async def sync(self):
-        """Reconcile local state with the exchange. Exchange state wins."""
+        """Reconcile local state with the exchange. Exchange state wins.
+
+        A symbol is unblocked only after its orders are confirmed, stray entries are
+        cancelled and an open position has a confirmed stop for its full size.
+        """
         for s in self.cfg.symbols:
-            stops = []
-            for o in await self.broker.open_orders(s):
-                p = purpose_of(o.client_id)
-                if p is Purpose.STOP:
-                    stops.append(o)
-                elif p is not None:
-                    await self.exec.cancel(o)
-            await self.drain()
-            pos, qty = self.positions[s], await self.broker.position_qty(s)
-            if abs(qty) < 1e-12:
-                if pos.has_qty:
-                    self.alert(
-                        "position_gone",
-                        s,
-                        f"local {pos.side} {pos.qty} is flat on the exchange, state reset",
-                        "warning",
-                        local=pos.to_dict(),
-                    )
-                pos.reset()
-                self.blocked.discard(s)
-                for o in stops:
-                    await self.exec.cancel(o)
+            try:
+                why = await self._sync(s)
+            except Exception as e:
+                log.exception("%s sync failed", s)
+                why = f"sync failed: {e!r}"
+            if why or s in self.exec.unknown:
+                self.block(s, "sync_unconfirmed", why or "order state unknown")
             else:
-                if not pos.has_qty or pos.side.sign * qty < 0:
-                    await self._adopt(s, qty)
-                elif abs(pos.qty - abs(qty)) > 1e-12:
-                    self.alert(
-                        "position_resized",
-                        s,
-                        f"local qty {pos.qty} -> exchange {abs(qty)}",
-                        "warning",
-                    )
-                pos.qty = abs(qty)
-                pos.state = PosState.POSITION_OPEN
-                self.blocked.discard(s)
-                # adopt a matching stop from before the restart, drop the rest
-                keep = next(
-                    (
-                        o
-                        for o in stops
-                        if abs(o.qty - pos.qty) < 1e-12 and o.side is pos.side.opposite
-                    ),
-                    None,
+                self.blocked.pop(s, None)
+
+    async def _sync(self, s: str) -> str:
+        """Reconcile one symbol; returns what is still unconfirmed, empty when clean."""
+        if not await self.exec.recheck(s):
+            return "order state unknown"
+        stops, bad = [], ""
+        for o in await self.broker.open_orders(s):
+            p = purpose_of(o.client_id)
+            if p is Purpose.STOP:
+                stops.append(o)
+            elif p is not None:
+                # entries (also left by a crashed run) and exits never survive a sync
+                if (await self.exec.cancel(o)).is_open:
+                    bad = f"{p} order {o.client_id} not cancelled"
+        await self.drain()
+        if bad:
+            return bad
+        self.entry[s] = self.close[s] = None
+        pos, qty = self.positions[s], await self.broker.position_qty(s)
+        if abs(qty) < 1e-12:
+            if pos.has_qty:
+                self.alert(
+                    "position_gone",
+                    s,
+                    f"local {pos.side} {pos.qty} is flat on the exchange, state reset",
+                    "warning",
+                    local=pos.to_dict(),
                 )
-                for o in stops:
-                    if o is not keep:
-                        await self.exec.cancel(o)
-                if keep is not None:
-                    self.exec.update(keep)
-                self.stop[s] = keep
-                await self._protect(s)
+            pos.reset()
+            for o in stops:
+                if (await self.exec.cancel(o)).is_open:
+                    bad = f"stop {o.client_id} not cancelled"
+            self.stop[s] = None
             await self.drain()
             self._save(s)
+            return bad
+        if not pos.has_qty or pos.side.sign * qty < 0:
+            await self._adopt(s, qty)
+        elif abs(pos.qty - abs(qty)) > 1e-12:
+            self.alert(
+                "position_resized", s, f"local qty {pos.qty} -> exchange {abs(qty)}", "warning"
+            )
+        pos.qty = abs(qty)
+        pos.state = PosState.POSITION_OPEN
+        # stops from before the restart: they are exchange truth, so confirmed
+        side = pos.side.opposite
+        for o in stops:
+            self.exec.update(o)
+        wrong = [o for o in stops if o.side is not side]
+        right = sorted((o for o in stops if o.side is side), key=lambda o: -o.remaining)
+        keep = next((o for o in right if abs(o.remaining - pos.qty) < 1e-12), None)
+        # until a full size stop is confirmed the largest existing one stays as protection
+        self.stop[s] = keep or (right[0] if right else None)
+        for o in wrong:
+            # a reduce-only stop on the wrong side never protects, removing it loses nothing
+            if (await self.exec.cancel(o)).is_open:
+                bad = f"stop {o.client_id} not cancelled"
+        await self._protect(s)  # places the new stop first, cancels self.stop[s] once confirmed
+        await self.drain()
+        if pos.has_qty and not self._protected(s):
+            # keep every existing stop, _protect already blocked and handled the risk
+            self._save(s)
+            return "no confirmed stop for the position"
+        for o in right:
+            if o.client_id == (self.stop[s].client_id if self.stop[s] else None):
+                continue
+            cur = self.exec.get(o.client_id) or o
+            if cur.is_open and (await self.exec.cancel(cur)).is_open:
+                bad = f"stop {o.client_id} not cancelled"
+        await self.drain()
+        self._save(s)
+        return bad
+
+    def _protected(self, s: str) -> bool:
+        """A confirmed open stop covers the whole position."""
+        pos, st = self.positions[s], self.stop[s]
+        return (
+            st is not None
+            and st.is_open
+            and self.exec.confirmed(st)
+            and st.side is pos.side.opposite
+            and st.remaining >= pos.qty - 1e-12
+        )
 
     # ---- market events
 
@@ -217,8 +270,12 @@ class Engine:
             return
         old = self.entry[s]
         if old is not None and old.is_open:
-            await self.exec.cancel(old)
+            res = await self.exec.cancel(old)
             await self.drain()
+            if res.is_open and not pos.has_qty:
+                # cancel not confirmed: the order may still fill, keep tracking it
+                self.block(s, "entry_cancel_unconfirmed", f"entry {old.client_id} not cancelled")
+                return
         if pos.has_qty:
             return
         self.entry[s] = None
@@ -226,8 +283,11 @@ class Engine:
 
         now = self.clock()
         st = self.market.state(s)
-        if st is None or self.halted or s in self.blocked:
-            log.info("%s skip: %s", s, "no data" if st is None else "halted")
+        if st is None or self.halted or self.blocked:
+            why = (
+                "no data" if st is None else "halted" if self.halted else f"blocked {self.blocked}"
+            )
+            log.info("%s skip: %s", s, why)
             return
         if now < self.paused_until:
             log.info("%s skip: paused (%s)", s, self.pause_reason)
@@ -281,6 +341,8 @@ class Engine:
         self.entry[s] = o
         res = await self.exec.submit(o)
         self.journal.order(res)
+        if not self.exec.confirmed(res):
+            self.block(s, "order_unknown", f"entry {o.client_id} state unknown")
         await self.drain()
         if res.status is OrderStatus.REJECTED and not pos.has_qty:
             pos.state = PosState.FLAT
@@ -307,6 +369,8 @@ class Engine:
         self.exec.update(o)
         self.journal.order(o)
         purpose = purpose_of(o.client_id)
+        if purpose is Purpose.STOP and f is None:
+            await self._stop_gone(o)
         if f is None or purpose is None:
             return
         self.journal.fill(f)
@@ -323,10 +387,15 @@ class Engine:
                     price=f.price,
                 )
             pos.apply(f, Purpose.ENTRY)
-            if o.is_open:
-                # any fill stops further entry
-                await self.exec.cancel(o)
-            self.entry[s] = None
+            cur = self.exec.get(o.client_id) or o
+            if cur.is_open:
+                # any fill stops further entry; until the cancel is confirmed more may fill
+                if (await self.exec.cancel(cur)).is_open:
+                    self.block(s, "entry_cancel_unconfirmed", f"entry {o.client_id} not cancelled")
+                else:
+                    self.entry[s] = None
+            else:
+                self.entry[s] = None
             await self._protect(s)
         else:
             t = pos.apply(f, purpose)
@@ -374,14 +443,19 @@ class Engine:
     # ---- protection and exit
 
     async def _protect(self, s: str):
-        """(Re)place the exchange side stop for the full position."""
+        """(Re)place the exchange side stop for the full position.
+
+        A resized stop is placed first; the old one is cancelled only after the exchange
+        confirmed the new one. A rejected or unknown stop leaves the position unprotected,
+        so it is closed.
+        """
         pos = self.positions[s]
+        if not pos.has_qty:
+            return
         await self.broker.before_protect(s)
+        if self._protected(s) and abs(self.stop[s].remaining - pos.qty) < 1e-12:
+            return
         old = self.stop[s]
-        if old is not None and old.is_open:
-            if abs(old.qty - pos.qty) < 1e-12:
-                return
-            await self.exec.cancel(old)
         stop_px = self.exits.stop_price(pos)
         r = self.rules[s]
         stop_px = r.price_down(stop_px) if pos.side.sign > 0 else r.price_up(stop_px)
@@ -396,15 +470,46 @@ class Engine:
             reduce_only=True,
             time=self.clock(),
         )
-        self.stop[s] = o
         res = await self.exec.submit(o)
         self.journal.order(res)
         log.info("%s exchange stop %s %s @ %s -> %s", s, o.side, o.qty, stop_px, res.status)
+        if res.status is not OrderStatus.REJECTED and self.exec.confirmed(res) and res.is_open:
+            self.stop[s] = res
+            if old is not None and old.is_open:
+                if (await self.exec.cancel(old)).is_open:
+                    self.block(s, "stop_cancel_unconfirmed", f"old stop {old.client_id} still open")
+            return
         if res.status is OrderStatus.REJECTED:
-            # no exchange side protection: get out now
             self.alert("stop_rejected", s, f"stop rejected ({res.reason}), closing", "critical")
-            if pos.state is PosState.POSITION_OPEN:
-                await self._exit(s, "stop_rejected", self.clock())
+        else:
+            # may or may not be on the exchange; sync resolves it later
+            self.block(s, "stop_unknown", f"stop {o.client_id} not confirmed")
+        # keep whatever protection there was
+        self.stop[s] = old if old is not None and old.is_open else None
+        if self._protected(s):
+            return
+        if pos.state is PosState.POSITION_OPEN:
+            await self._exit(
+                s,
+                "stop_rejected" if res.status is OrderStatus.REJECTED else "stop_unknown",
+                self.clock(),
+            )
+
+    async def _stop_gone(self, o: Order):
+        """The exchange ended our current stop without a fill (expired, cancelled outside)."""
+        s, pos = o.symbol, self.positions[o.symbol]
+        cur = self.stop[s]
+        if cur is None or cur.client_id != o.client_id or o.is_open or o.filled_qty > 0:
+            return
+        if o.status is OrderStatus.REJECTED:
+            return  # handled where it was placed
+        if not pos.has_qty or pos.state is not PosState.POSITION_OPEN:
+            return
+        self.stop[s] = None
+        self.alert(
+            "stop_lost", s, f"exchange stop {o.status} ({o.reason}), placing again", "critical"
+        )
+        await self._protect(s)
 
     async def cancel_entries(self):
         """On shutdown: pull resting entries, keep positions and their stops."""
@@ -424,8 +529,9 @@ class Engine:
     async def _cancel_protection(self, s: str):
         for book in (self.stop, self.close):
             o = book[s]
-            if o is not None and o.is_open:
-                await self.exec.cancel(o)
+            if o is not None and o.is_open and (await self.exec.cancel(o)).is_open:
+                # reduce-only, so it cannot open a position, but sync must clear it
+                self.block(s, "stop_cancel_unconfirmed", f"{o.client_id} still open after close")
             book[s] = None
 
     async def _exit(self, s: str, reason: str, ts: int):
@@ -445,11 +551,14 @@ class Engine:
         self.close[s] = o
         res = await self.exec.submit(o)
         self.journal.order(res)
+        if not self.exec.confirmed(res):
+            self.block(s, "order_unknown", f"exit {o.client_id} state unknown")
         await self.drain()
         if res.status is OrderStatus.REJECTED and pos.has_qty:
-            # retry on the next mark price
+            # retry on the next mark price; e.g. the exchange stop already closed it and the
+            # fill is not here yet: reconcile so a lost event cannot keep it retrying
             pos.state = PosState.POSITION_OPEN
-            self.alert("exit_rejected", s, f"exit rejected ({res.reason}), retrying", "warning")
+            self.block(s, "exit_rejected", f"exit rejected ({res.reason}), retrying")
 
     async def _adopt(self, s: str, qty: float):
         """Exchange position without a matching local record: manage it from now on."""
@@ -476,6 +585,15 @@ class Engine:
             qty=qty,
             price=px,
         )
+
+    def check_sizes(self) -> dict[str, str]:
+        """Warn about symbols the configured size can never trade (lot size / min notional)."""
+        prices = {s: d.bars[-1].close for s, d in self.market.data.items() if d.bars}
+        bad = self.risk.untradable(prices)
+        if bad:
+            msg = f"order size fails exchange filters, these never trade: {bad}"
+            self.alert("untradable", None, msg, "warning", symbols=bad)
+        return bad
 
     def snapshot(self) -> dict:
         """Current state for status files and a WebUI."""

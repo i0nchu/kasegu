@@ -16,6 +16,14 @@ class DistanceStrategy(Strategy):
         # EMA needs a long warmup to remove the seed bias
         return max(self.cfg.ema_period * 3, self.cfg.vol_period + 1)
 
+    def side(self, last: float, trend: float) -> Side | None:
+        """Trend following: buy dips above the EMA, sell rallies below it."""
+        if last > trend:
+            return Side.BUY
+        if last < trend:
+            return Side.SELL
+        return None
+
     def reference(self, s: MarketState) -> float:
         return s.ask if self.cfg.reference == "ask" else (s.bid + s.ask) / 2
 
@@ -27,12 +35,8 @@ class DistanceStrategy(Strategy):
         if len(s) < self.warmup or s.ask <= 0 or s.bid <= 0:
             return None
         trend = ind.ema(s.close, self.cfg.ema_period)
-        last = s.close[-1]
-        if last > trend:
-            side = Side.BUY
-        elif last < trend:
-            side = Side.SELL
-        else:
+        side = self.side(s.close[-1], trend)
+        if side is None:
             return None
 
         ref = self.reference(s)

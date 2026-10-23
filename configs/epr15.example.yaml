@@ -1,0 +1,81 @@
+# EPR15 (frozen at git tag alpha-epr15-v1) for shadow / testnet / small account validation.
+# Strategy and exit are frozen; only symbols and risk are yours to set. See docs/epr15.md.
+# The research replication (40 coins, 297 USDT per trade) is configs/epr15.research.yaml.
+# live mode is never enabled from this file; use --mode live --confirm-live
+mode: paper
+
+# coins with a 5 USDT min notional; BTC (50), ETH / LTC / LINK / BCH / ETC (20) need more size.
+# Startup warns about any symbol the size below cannot trade.
+symbols: [SOLUSDT, DOGEUSDT, XRPUSDT, ADAUSDT, AVAXUSDT, SUIUSDT]
+
+timeframe: 1m
+
+# frozen: any other value is refused at startup
+strategy:
+  id: epr15
+  k: 12            # limit = ask x (1 - 12 x vol%), vol% = (ATR60 / close + mean amplitude60) / 2
+  ema_period: 240  # orders only while the 1m close is below EMA240, long only
+  vol_period: 60
+  reference: ask
+
+# frozen: fixed 3% stop (also on the exchange) and a market exit 15 minutes after the fill
+exit:
+  policy: time_only
+  stop_loss_pct: 3.0
+  max_holding_minutes: 15
+
+risk:
+  # 10 x 2 x 0.99 = 19.8 USDT notional per trade. To trade less, lower margin_budget;
+  # never raise leverage to reach a min notional.
+  margin_budget: 10
+  leverage: 2
+  max_leverage: 3
+  # resting entries count as positions and as exposure: in a crash every resting buy can
+  # fill at once, so max_positions x notional is the real worst case (here 6 x 19.8)
+  max_positions: 6
+  max_notional: 120
+  # estimate at the 3% stop price only: gaps, mark price lag and slippage come on top
+  # (the engine replay saw stop fills down to -6.4%), see docs/epr15.md
+  max_loss_per_trade: 0.7
+  max_spread_pct: 0.05
+  min_quote_qty: 0.0
+  stale_after_s: 10
+  cost_reserve_pct: 1.0
+  max_daily_loss: 3         # USDT per UTC day, pauses new entries until the next day
+  max_consecutive_losses: 3
+  loss_pause_min: 120
+
+fee:
+  maker: 0.0002
+  taker: 0.0005
+  slippage_pct: 0.02
+  use_account_rate: false   # true in live to use the account rates
+
+exchange:
+  testnet: true
+  data_testnet: false
+  history_bars: 1500        # EMA240 needs 720 bars, more bars = less seed bias
+  heartbeat_s: 30
+
+paper:
+  balance: 100
+
+live:
+  auto_cancel_s: 0          # see docs/epr15.md before turning on
+  keepalive_min: 30
+
+backtest:
+  start: 2026-10-01
+  end: 2026-10-07
+  cache_dir: data/history
+  out_dir: data/backtests
+
+alerts:
+  min_level: warning
+  telegram: false
+  webhook_url: ""
+  webhook_min_level: info
+  events_path: data/events-epr15.jsonl
+
+db_path: data/journal-epr15.db
+status_path: data/status-epr15.json

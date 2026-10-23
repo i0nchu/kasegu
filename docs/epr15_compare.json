@@ -1,0 +1,52 @@
+{
+  "symbol_days": 509,
+  "errors": [],
+  "research_trades": 560,
+  "engine_trades": 556,
+  "matched": 556,
+  "match_rate": 0.9928571428571429,
+  "categories": {
+    "time": 470,
+    "exit:stop_path": 61,
+    "boundary": 16,
+    "fees": 12,
+    "exit:stop_trigger": 11,
+    "fill:entry_price": 5,
+    "funding": 4,
+    "fill:research_only": 4,
+    "fill:rejected:stale_data": 1,
+    "time:in_position": 1
+  },
+  "entry_price_equal": 551,
+  "matched_ex_boundary": 542,
+  "avg_net_research": 0.25558912444038745,
+  "avg_net_engine": 0.30694280755962655,
+  "avg_d_net": 0.05135368311923908,
+  "median_abs_d_net": 0.057867197599892325,
+  "avg_hold_research": 13.404059040590406,
+  "avg_hold_engine": 13.565192312423124,
+  "exit_reasons_research": {
+    "max_hold": 470,
+    "stop_loss": 72
+  },
+  "exit_reasons_engine": {
+    "time_exit": 481,
+    "exchange_stop": 61
+  },
+  "avg_net_research_all": 0.22379650094477563,
+  "avg_net_engine_all": 0.2899196415458065,
+  "d_net_by_category": {
+    "exit:stop_path": {
+      "n": 61,
+      "avg_d_net": -0.46142276072463967
+    },
+    "exit:stop_trigger": {
+      "n": 11,
+      "avg_d_net": 4.943643835487487
+    },
+    "time": {
+      "n": 470,
+      "avg_d_net": 0.003405111626528194
+    }
+  }
+}

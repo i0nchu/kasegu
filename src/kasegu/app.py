@@ -75,6 +75,7 @@ async def run_paper(cfg: AppConfig):
     )
     # paper positions do not survive a restart, sync resets local state
     eng.restore()
+    eng.check_sizes()
     await eng.sync()
     eng.alert("started", None, f"paper {cfg.strategy.id} k={cfg.strategy.k} {cfg.symbols}")
     try:
@@ -123,6 +124,7 @@ async def run_live(cfg: AppConfig):
         events=bus,
     )
     eng.restore()
+    eng.check_sizes()
     # stream first so no fill between sync and subscribe is missed
     await broker.connect()
     await eng.sync()
@@ -195,7 +197,12 @@ async def serve(
     if broker is not None:
         broker.wake = lambda: q.put_nowait(("drain", None))
     live = cfg.live
-    due = {"keepalive": time.monotonic() + live.keepalive_min * 60, "countdown": 0.0, "status": 0.0}
+    due = {
+        "keepalive": time.monotonic() + live.keepalive_min * 60,
+        "countdown": 0.0,
+        "status": 0.0,
+        "reconcile": 0.0,
+    }
     down_since = last_alert = 0.0  # monotonic time of the first failed reconnect
 
     while True:
@@ -221,6 +228,15 @@ async def serve(
             except Exception:
                 log.exception("status write failed")
             due["status"] = now + 5
+        if eng.blocked and now >= due["reconcile"]:
+            # unknown order or stop state: re-read the exchange until it is clear
+            try:
+                await eng.sync()
+                if not eng.blocked:
+                    eng.alert("reconciled", None, "exchange state confirmed, entries resume")
+            except Exception:
+                log.exception("reconcile failed")
+            due["reconcile"] = now + 30
         if broker is not None:
             try:
                 if now >= due["keepalive"]:
