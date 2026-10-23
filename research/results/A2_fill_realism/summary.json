@@ -1,0 +1,19 @@
+{
+ "orders_checked": 607,
+ "bar_fills_with_no_trade_at_limit": 0,
+ "through_rate": 1.0,
+ "touch_only_rate": 0.0,
+ "median_secs_to_touch": 36.046,
+ "profile_through": {
+  "m1": -0.3279119551085413,
+  "m5": 0.39979608241613207,
+  "m15": 1.2565242029634731,
+  "m30": 1.4869556156296013
+ },
+ "profile_touch_only": {
+  "m1": NaN,
+  "m5": NaN,
+  "m15": NaN,
+  "m30": NaN
+ }
+}
