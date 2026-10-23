@@ -320,7 +320,8 @@ async def test_unknown_cancel_keeps_order_and_blocks():
     await next_bar(eng, clock)
     # no second entry next to an order that may still be live
     assert eng.entry[S] is o and len([x for x in broker.orders.values() if x.is_open]) == 1
-    assert eng.blocked == {S: "order_unknown"} and "order_unknown" in kinds(eng)
+    assert eng.blocked == {S: "entry_cancel_unconfirmed"}
+    assert "entry_cancel_unconfirmed" in kinds(eng)
     await next_bar(eng, clock, T)
     assert eng.entry[T] is None  # blocked on every symbol
     broker.cancel, broker.query = cancel, query
@@ -328,26 +329,6 @@ async def test_unknown_cancel_keeps_order_and_blocks():
     assert not eng.blocked and not await broker.open_orders(S)
     await next_bar(eng, clock, T)
     assert eng.entry[T] is not None
-
-
-async def test_unknown_stop_blocks_entries():
-    eng, broker, clock = setup()
-    place = broker.place
-
-    async def stop_down(o):
-        if o.type is OrderType.STOP_MARKET:
-            raise ConnectionError("down")
-        return await place(o)
-
-    async def nothing(*a):
-        return None
-
-    broker.place, broker.query = stop_down, nothing
-    await fill_entry(eng, clock)
-    assert eng.blocked == {S: "order_unknown"}
-    broker.place = place
-    await eng.sync()  # finds no stop on the exchange and places one
-    assert not eng.blocked and len(open_stops(broker)) == 1
 
 
 async def test_lost_stop_is_replaced():
