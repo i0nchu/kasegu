@@ -5,8 +5,9 @@ that have been listed for at least 60 days, delisted coins included. A coin's mo
 with at least one eligible day, plus the month before (indicator warm-up).
 
 Needs the daily panel from research/momentum/download_all.py first.
-Usage: PYTHONPATH=research/momentum uv run python research/fast/download_5m.py
-Files land in data/history/monthly/klines/SYM/5m/; the month list in data/research/fast/months.json.
+Usage: PYTHONPATH=research/momentum uv run python research/fast/download_5m.py [INTERVAL FROM_MONTH]
+       (e.g. `1m 2022-01` for the EPR15 check: 1m klines of the same coin-months from 2022-01 on)
+Files land in data/history/monthly/klines/SYM/<interval>/; the month list in data/research/fast/months.json.
 """
 
 import concurrent.futures as cf
@@ -16,7 +17,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 import e5_survivorship as E5
@@ -69,10 +69,13 @@ def universe_months() -> dict[str, list[str]]:
 
 
 def main():
+    import sys
+
+    iv, first = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else ("5m", "2020-01")
     OUT.mkdir(parents=True, exist_ok=True)
     um = universe_months()
     (OUT / "months.json").write_text(json.dumps(um))
-    jobs = [f"{s}/5m/{s}-5m-{m}.zip" for s, ms in um.items() for m in ms]
+    jobs = [f"{s}/{iv}/{s}-{iv}-{m}.zip" for s, ms in um.items() for m in ms if m >= first]
     print(len(um), "coins", len(jobs), "files")
     with cf.ThreadPoolExecutor(24) as ex:
         res = list(ex.map(fetch, jobs))
