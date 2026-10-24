@@ -1,6 +1,7 @@
 """Download monthly 1h klines and funding rates (2020-01 to 2026-09) from data.binance.vision.
 
 Usage: uv run python research/momentum/download.py
+       uv run python research/momentum/download.py SYMBOL_FILE 2024-01   (1h klines only)
 Files land in data/history/monthly/{klines/SYM/1h, fundingRate/SYM}/; coins not yet listed 404.
 """
 
@@ -55,8 +56,13 @@ def fetch(rel: str) -> str:
 
 
 def main():
+    import sys
+
     jobs = []
-    for s in UNIVERSE:
+    if len(sys.argv) > 2:  # 1h klines for a symbol list (funding comes from download_all.py)
+        syms = Path(sys.argv[1]).read_text().split()
+        jobs = [f"klines/{s}/1h/{s}-1h-{m}.zip" for s in syms for m in months(sys.argv[2])]
+    for s in UNIVERSE if not jobs else []:
         for m in months():
             jobs.append(f"klines/{s}/1h/{s}-1h-{m}.zip")
             jobs.append(f"fundingRate/{s}/{s}-fundingRate-{m}.zip")
