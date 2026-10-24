@@ -116,7 +116,7 @@ def main():
     B40["atr"] = E3.atr(B40)
     k40 = np.searchsorted(B40["t"], B["t"][0])
     B40 = {k: v[k40:] for k, v in B40.items()}
-    rows = []
+    rows, curves = [], {}
     specs = {
         "dc4h_N20_M3_v2": ("dc", 20, 2, 3, "chand"),
         "dc4h_N20_M2_v2": ("dc", 20, 2, 2, "chand"),
@@ -135,11 +135,14 @@ def main():
                 r = E4.trades_to_returns(tt, BB)
                 r = r[r.index >= pd.Timestamp("2024-01-21", tz="UTC")]
                 m = C.metrics(r)
+                curves[f"{name}_{uni}_{leg}"] = r
                 rows.append({"name": name, "universe": uni, "leg": leg, "trades": len(tt),
                              "net_bp": round(float(tt.net.mean() * 1e4), 1), **m})  # fmt: skip
                 print(rows[-1], flush=True)
     df = pd.DataFrame(rows)
     df.to_csv(out / "summary.csv", index=False)
+    daily = pd.DataFrame(curves).groupby(lambda x: x.floor("D")).apply(lambda g: (1 + g).prod() - 1)
+    daily.to_csv(out / "daily_returns.csv.gz")
     print(df.to_string(index=False))
 
 
