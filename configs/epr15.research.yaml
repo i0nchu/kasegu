@@ -35,8 +35,8 @@ risk:
   margin_budget: 30
   leverage: 10
   max_leverage: 10
-  max_positions: 40         # the research had no global cap, one position per coin
-  max_notional: 12000       # total exposure incl. resting entries
+  max_symbol_notional: 300  # one 297 USDT position per coin, no account cap, as in the research
+  max_account_loss: 0       # off, as in the research
   max_loss_per_trade: 0     # off, as in the research
   max_spread_pct: 0.05
   min_quote_qty: 0.0

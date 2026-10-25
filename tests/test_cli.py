@@ -63,3 +63,25 @@ def test_epr15_refuses_overrides():
     assert main(base + ["--k", "3"]) == 2
     # another strategy cannot inherit the epr15 exit by accident, and back
     assert main(["--config", "configs/config.example.yaml", "--strategy", "epr15"]) == 2
+
+
+def test_removed_risk_keys_exit_cleanly(tmp_path):
+    cfg = tmp_path / "old.yaml"
+    cfg.write_text("symbols: [BTCUSDT]\nrisk:\n  max_positions: 3\n")
+    assert main(["--config", str(cfg), "--mode", "backtest"]) == 2
+
+
+def test_reset_account_stop(tmp_path):
+    from kasegu.core.engine import ACCOUNT
+    from kasegu.storage.journal import Journal
+
+    db = tmp_path / "j.db"
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text(f"symbols: [BTCUSDT]\ndb_path: {db.as_posix()}\n")
+    assert main(["--config", str(cfg), "--reset-account-stop"]) == 2  # no journal yet
+    j = Journal(db)
+    j.save_state(ACCOUNT, {"base": 0.0, "stopped": "account loss -12 USDT <= -10"})
+    j.close()
+    assert main(["--config", str(cfg), "--reset-account-stop"]) == 0
+    j = Journal(db)
+    assert j.load_state()[ACCOUNT]["stopped"] == ""

@@ -29,6 +29,7 @@ from kasegu.strategies.base import Strategy
 log = logging.getLogger(__name__)
 
 DAY = 86_400_000
+ACCOUNT = "__account__"  # state row of the account loss stop
 _LOG_LEVEL = {"info": logging.INFO, "warning": logging.WARNING, "critical": logging.ERROR}
 
 Backfill = Callable[[str, int], Awaitable[list[Kline]]]
@@ -84,18 +85,29 @@ class Engine:
         self.streak = 0  # consecutive losing trades
         self.paused_until = 0  # ms, no new entries before
         self.pause_reason = ""
+        # account loss stop: net of the journal's trades since the last reset + open pnl
+        self.realized = 0.0  # net of every closed trade in the journal
+        self.base = 0.0  # realized at the last reset of the account stop
+        self.stopped = ""  # why the strategy was stopped, empty while running
         broker.listener = lambda o, f: self.pending.append((o, f))
 
     # ---- startup / recovery
 
     def restore(self):
-        for s, d in self.journal.load_state().items():
+        state = self.journal.load_state()
+        for s, d in state.items():
             if s in self.positions.pos:
                 self.positions.pos[s] = Position.from_dict(d)
+        acct = state.get(ACCOUNT, {})
+        self.base, self.stopped = acct.get("base", 0.0), acct.get("stopped", "")
+        self.realized = sum(_net(t) for t in self.journal.trades_since(0))
         # today's closed trades count towards the loss limits after a restart
         now = self.clock()
         for t in self.journal.trades_since(now - now % DAY):
-            self._count(t["close_time"], t["pnl"] - t["fees"] + t["funding"], alert=False)
+            self._count(t["close_time"], _net(t), alert=False)
+        if self.stopped:
+            msg = f"strategy stays stopped ({self.stopped}), see --reset-account-stop"
+            self.alert("account_stopped", None, msg, "critical")
 
     def alert(self, kind: str, s: str | None, msg: str, level: str = "info", **data):
         """Journal, log and publish an event for alerts / outside consumers."""
@@ -240,7 +252,13 @@ class Engine:
         self.broker.on_mark(m)
         await self.drain()
         s, pos = m.symbol, self.positions[m.symbol]
+        await self.check_account(m.time)
         if not pos.has_qty:
+            return
+        if self.stopped:
+            # also retries a close that was rejected or is not filled yet
+            if pos.state is PosState.POSITION_OPEN:
+                await self._exit(s, "account_stop", m.time)
             return
         tier = pos.tier
         reason = self.exits.update(pos, m.price, m.time)
@@ -283,10 +301,13 @@ class Engine:
 
         now = self.clock()
         st = self.market.state(s)
-        if st is None or self.halted or self.blocked:
-            why = (
-                "no data" if st is None else "halted" if self.halted else f"blocked {self.blocked}"
-            )
+        if st is None or self.halted or self.blocked or self.stopped:
+            if st is None:
+                why = "no data"
+            elif self.stopped:
+                why = f"stopped: {self.stopped}"
+            else:
+                why = "halted" if self.halted else f"blocked {self.blocked}"
             log.info("%s skip: %s", s, why)
             return
         if now < self.paused_until:
@@ -300,8 +321,7 @@ class Engine:
         plan, why = self.risk.check(
             sig,
             self.market[s].quote,
-            self.positions.open_count(),
-            self._exposure(),
+            self._exposure(s),
             stale=stale,
             unknown=s in self.exec.unknown,
         )
@@ -348,15 +368,60 @@ class Engine:
             pos.state = PosState.FLAT
             self.entry[s] = None
 
-    def _exposure(self) -> float:
-        total = 0.0
+    def _exposure(self, s: str) -> float:
+        """Notional of one symbol's open position and resting entry."""
+        pos, mark = self.positions[s], self.market[s].mark
+        total = pos.notional(mark.price if mark else pos.entry_price)
+        o = self.entry[s]
+        if o is not None and o.is_open:
+            total += o.remaining * o.price
+        return total
+
+    # ---- account loss stop
+
+    def account_pnl(self) -> float:
+        """Net since the last reset: closed trades plus open positions at the mark price."""
+        total = self.realized - self.base
         for s, pos in self.positions.pos.items():
-            mark = self.market[s].mark
-            total += pos.notional(mark.price if mark else pos.entry_price)
+            if pos.has_qty:
+                mark = self.market[s].mark
+                px = mark.price if mark else pos.entry_price
+                total += pos.side.sign * (px - pos.entry_price) * pos.qty - pos.fees + pos.funding
+        return total
+
+    async def check_account(self, ts: int):
+        """At -max_account_loss: cancel entries, close every position and stop the strategy.
+
+        The stop is saved in the journal, so a restart stays stopped until it is reset.
+        """
+        limit = self.cfg.risk.max_account_loss
+        if not limit or self.stopped:
+            return
+        pnl = self.account_pnl()
+        if pnl > -limit:
+            return
+        self.stopped = f"account loss {pnl:.2f} USDT <= -{limit:g}"
+        self.journal.save_state(ACCOUNT, {"base": self.base, "stopped": self.stopped}, ts=ts)
+        self.alert(
+            "account_stop",
+            None,
+            f"strategy stopped, {self.stopped}: cancelling entries and closing positions",
+            "critical",
+            pnl=pnl,
+            limit=limit,
+        )
+        for s in self.cfg.symbols:
             o = self.entry[s]
             if o is not None and o.is_open:
-                total += o.remaining * o.price
-        return total
+                if (await self.exec.cancel(o)).is_open:
+                    # may still fill; the fill gets its stop and the next mark closes it
+                    self.block(s, "entry_cancel_unconfirmed", f"entry {o.client_id} not cancelled")
+                else:
+                    self.entry[s] = None
+                    if not self.positions[s].has_qty:
+                        self.positions[s].state = PosState.FLAT
+            await self.drain()
+        await self.flatten("account_stop")
 
     # ---- order events
 
@@ -408,6 +473,7 @@ class Engine:
         if not t.reason:
             t.reason = "exchange_stop"
         self.trades.append(t)
+        self.realized += t.net
         self.journal.trade(t, ts=t.close_time)
         self.alert(
             "trade_closed",
@@ -621,6 +687,8 @@ class Engine:
             "ts": now,
             "strategy": self.strategy.id,
             "halted": self.halted,
+            "stopped": self.stopped,
+            "account_pnl": self.account_pnl(),
             "paused_until": self.paused_until or None,
             "pause_reason": self.pause_reason if now < self.paused_until else "",
             "day_net": self.day_net,
@@ -656,3 +724,16 @@ class Engine:
 
     def _save(self, s: str, ts: int | None = None):
         self.journal.save_state(s, self.positions[s].to_dict(), ts=ts)
+
+
+def _net(t: dict) -> float:
+    return t["pnl"] - t["fees"] + t["funding"]
+
+
+def reset_account_stop(journal: Journal) -> tuple[str, float]:
+    """Clear the account stop. Losses count again from the realized net at this moment."""
+    prev = journal.load_state().get(ACCOUNT, {}).get("stopped", "")
+    base = sum(_net(t) for t in journal.trades_since(0))
+    journal.save_state(ACCOUNT, {"base": base, "stopped": ""})
+    journal.event("account_reset", previous=prev, base=base)
+    return prev, base

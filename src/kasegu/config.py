@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Mode = Literal["backtest", "paper", "live"]
@@ -38,12 +38,35 @@ class ExitConfig(BaseModel):
         return self
 
 
+class SymbolRisk(BaseModel):
+    """Per symbol override of the risk defaults; unset fields fall back to `risk`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    margin_budget: float | None = Field(None, gt=0)  # USDT margin per trade
+    max_notional: float | None = Field(None, ge=0)  # USDT exposure cap, 0 = off
+
+
+# removed in favour of per symbol caps and the account loss stop
+_REMOVED_RISK = {
+    "max_positions": "use risk.max_symbol_notional / risk.symbols.<SYMBOL>.max_notional",
+    "max_notional": "use risk.max_symbol_notional per symbol and risk.max_account_loss",
+}
+
+
 class RiskConfig(BaseModel):
-    margin_budget: float = Field(20.0, gt=0)  # USDT per trade
+    model_config = ConfigDict(extra="forbid")
+
+    margin_budget: float = Field(20.0, gt=0)  # USDT margin per trade, default for every symbol
     leverage: int = Field(5, ge=1)
     max_leverage: int = 10
-    max_positions: int = Field(3, ge=1)
-    max_notional: float = 500.0  # total exposure in USDT
+    # exposure cap per symbol in USDT notional: open position + resting entry, 0 = off
+    max_symbol_notional: float = Field(0.0, ge=0)
+    symbols: dict[str, SymbolRisk] = {}  # overrides of margin_budget / max_notional
+    # account stop: realized net of every trade in the journal + open unrealized pnl at or
+    # below -max_account_loss USDT cancels entries, closes positions and stops the strategy
+    # until it is reset (python -m kasegu --reset-account-stop), 0 = off
+    max_account_loss: float = Field(0.0, ge=0)
     max_loss_per_trade: float = Field(0.0, ge=0)  # USDT lost at the fixed stop, 0 = off
     max_spread_pct: float = 0.05
     min_quote_qty: float = 0.0  # min top-of-book qty in base asset
@@ -54,11 +77,30 @@ class RiskConfig(BaseModel):
     max_consecutive_losses: int = Field(0, ge=0)
     loss_pause_min: int = Field(60, gt=0)  # pause after the loss streak
 
+    @model_validator(mode="before")
+    @classmethod
+    def _removed(cls, data):
+        if isinstance(data, dict):
+            old = [k for k in _REMOVED_RISK if k in data]
+            if old:
+                hint = "; ".join(f"risk.{k} was removed, {_REMOVED_RISK[k]}" for k in old)
+                raise ValueError(hint)
+        return data
+
     @model_validator(mode="after")
     def _check_lev(self):
         if self.leverage > self.max_leverage:
             raise ValueError("leverage exceeds max_leverage")
+        self.symbols = {k.upper(): v for k, v in self.symbols.items()}
         return self
+
+    def budget(self, symbol: str) -> float:
+        o = self.symbols.get(symbol)
+        return o.margin_budget if o and o.margin_budget is not None else self.margin_budget
+
+    def symbol_cap(self, symbol: str) -> float:
+        o = self.symbols.get(symbol)
+        return o.max_notional if o and o.max_notional is not None else self.max_symbol_notional
 
 
 class FeeConfig(BaseModel):
@@ -122,6 +164,9 @@ class AppConfig(BaseModel):
     @model_validator(mode="after")
     def _upper(self):
         self.symbols = [s.upper() for s in self.symbols]
+        extra = set(self.risk.symbols) - set(self.symbols)
+        if extra:
+            raise ValueError(f"risk.symbols has symbols that are not traded: {sorted(extra)}")
         return self
 
 
