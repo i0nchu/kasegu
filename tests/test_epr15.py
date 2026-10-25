@@ -41,7 +41,7 @@ def epr_cfg(**kw) -> AppConfig:
         strategy=EPR,
         exit=EXIT,
         fee={"slippage_pct": 0.0},
-        risk={"margin_budget": 30, "leverage": 10, "max_spread_pct": 1.0, "max_notional": 1e6},
+        risk={"margin_budget": 30, "leverage": 10, "max_spread_pct": 1.0},
     )
     return AppConfig(**{**base, **kw})
 
@@ -151,7 +151,7 @@ def test_engine_refuses_wrong_exit():
 
 
 def test_limit_floored_to_tick_and_post_only():
-    r = RiskManager(RiskConfig(max_spread_pct=1, max_notional=1e6), RULES)
+    r = RiskManager(RiskConfig(max_spread_pct=1), RULES)
     q = Quote(S, 99.99, 100.0, 5, 5, 0)
     plan, why = r.check(Signal(S, Side.BUY, 88.0049, 0), q, 0, 0)
     assert why == "ok" and plan.price == 88.0
@@ -373,23 +373,88 @@ async def test_stale_data_blocks_entry():
     assert "stale_data" in row[0]
 
 
-async def test_global_position_and_exposure_limits():
-    cfg = epr_cfg(
-        symbols=[S, T],
-        risk={"margin_budget": 30, "leverage": 10, "max_spread_pct": 1, "max_positions": 1},
-    )
-    eng, broker, clock = setup(cfg=cfg)
+async def test_per_symbol_budget_and_exposure():
+    risk = {
+        "margin_budget": 30,
+        "leverage": 10,
+        "max_spread_pct": 1,
+        "max_symbol_notional": 300,
+        "symbols": {T: {"margin_budget": 10, "max_notional": 120}},
+    }
+    eng, broker, clock = setup(cfg=epr_cfg(symbols=[S, T], risk=risk))
     await fill_entry(eng, clock, S)
     await next_bar(eng, clock, T)
-    assert eng.entry[T] is None  # one position across all symbols
-    cfg = epr_cfg(
-        symbols=[S, T],
-        risk={"margin_budget": 30, "leverage": 10, "max_spread_pct": 1, "max_notional": 400},
-    )
-    eng, broker, clock = setup(cfg=cfg)
+    # no account wide position cap: T still trades with its own budget beside S's position
+    assert eng.positions[S].has_qty
+    o = eng.entry[T]
+    assert o is not None and o.price * o.qty == pytest.approx(99, rel=0.02)  # 10 x 10 x 0.99
+    # T's own cap below one trade: no order for T, S unaffected
+    risk["symbols"][T]["max_notional"] = 80
+    eng, broker, clock = setup(cfg=epr_cfg(symbols=[S, T], risk=risk))
     await next_bar(eng, clock, S)
     await next_bar(eng, clock, T)
-    assert eng.entry[S] is not None and eng.entry[T] is None  # 2 x 297 > 400
+    assert eng.entry[S] is not None and eng.entry[T] is None
+    row = eng.journal.db.execute(
+        "SELECT data FROM events WHERE kind = 'signal' AND symbol = ? ORDER BY id DESC", (T,)
+    ).fetchone()
+    assert "max_symbol_notional" in row[0]
+
+
+def test_risk_symbols_must_be_traded():
+    with pytest.raises(ValueError, match="not traded"):
+        epr_cfg(risk={"symbols": {T: {"margin_budget": 5}}})
+
+
+async def test_account_loss_stop_closes_everything_and_survives_restart():
+    from kasegu.core.engine import reset_account_stop
+
+    risk = {"margin_budget": 30, "leverage": 10, "max_spread_pct": 1, "max_account_loss": 5}
+    cfg = epr_cfg(symbols=[S, T], risk=risk)
+    eng, broker, clock = setup(cfg=cfg)
+    px = await fill_entry(eng, clock, S)
+    await next_bar(eng, clock, T)
+    assert eng.positions[S].has_qty and eng.entry[T] is not None
+    opened = eng.positions[S].open_time
+    # 297 USDT long, -1%: about -3 USDT open loss, above the limit only with more
+    await eng.on_mark(MarkPrice(S, px * 0.99, 0, 0, opened + MINUTE))
+    assert not eng.stopped and eng.positions[S].has_qty
+    await eng.on_mark(MarkPrice(S, px * 0.98, 0, 0, opened + 2 * MINUTE))
+    assert eng.stopped.startswith("account loss")
+    assert eng.entry[T] is None or not eng.entry[T].is_open  # resting entry pulled
+    assert not eng.positions[S].has_qty and eng.trades[-1].reason == "account_stop"
+    assert "account_stop" in kinds(eng)
+    await next_bar(eng, clock, T)
+    await next_bar(eng, clock, S)
+    assert eng.entry[S] is None and eng.entry[T] is None  # nothing new opens
+    assert eng.snapshot()["stopped"]
+
+    # restart on the same journal: still stopped
+    eng2 = Engine(cfg, create(cfg.strategy), PaperBroker(cfg.fee), eng.market, RULES, eng.journal,
+                  clock=clock)  # fmt: skip
+    eng2.restore()
+    # the paper exit filled at the quote, not the mark, so the realized loss is smaller:
+    # the saved stop, not the current pnl, keeps it stopped
+    assert eng2.stopped.startswith("account loss")
+    await next_bar(eng2, clock, S)
+    assert eng2.entry[S] is None
+
+    # reset: losses count from now, entries resume
+    prev, _ = reset_account_stop(eng.journal)
+    assert prev.startswith("account loss")
+    eng3 = Engine(cfg, create(cfg.strategy), PaperBroker(cfg.fee), eng.market, RULES, eng.journal,
+                  clock=clock)  # fmt: skip
+    eng3.restore()
+    assert not eng3.stopped and eng3.account_pnl() == pytest.approx(0)
+    await next_bar(eng3, clock, S)
+    assert eng3.entry[S] is not None
+
+
+async def test_account_loss_off_by_default():
+    eng, broker, clock = setup()
+    px = await fill_entry(eng, clock)
+    opened = eng.positions[S].open_time
+    await eng.on_mark(MarkPrice(S, px * 0.975, 0, 0, opened + MINUTE))
+    assert not eng.stopped and eng.positions[S].has_qty
 
 
 async def test_loss_limits_pause_epr15():
@@ -398,7 +463,6 @@ async def test_loss_limits_pause_epr15():
             "margin_budget": 30,
             "leverage": 10,
             "max_spread_pct": 1,
-            "max_notional": 1e6,
             "max_consecutive_losses": 1,
         }
     )
@@ -432,12 +496,10 @@ def test_leverage_cannot_bypass_loss_budget():
     sig = Signal(S, Side.BUY, 88.0, 0)
 
     def check(lev):
-        cfg = RiskConfig(
-            margin_budget=30, leverage=lev, max_spread_pct=1, max_notional=1e6, max_loss_per_trade=9
-        )
+        cfg = RiskConfig(margin_budget=30, leverage=lev, max_spread_pct=1, max_loss_per_trade=9)
         r = RiskManager(cfg, RULES)
         r.stop_loss_pct = 3.0
-        return r.check(sig, q, 0, 0)[1]
+        return r.check(sig, q, 0)[1]
 
     assert check(10) == "ok"  # 297 x 3% = 8.9 USDT
     with pytest.raises(ValueError):
@@ -447,9 +509,8 @@ def test_leverage_cannot_bypass_loss_budget():
         leverage=20,
         max_leverage=20,
         max_spread_pct=1,
-        max_notional=1e6,
         max_loss_per_trade=9,
     )
     r = RiskManager(cfg, RULES)
     r.stop_loss_pct = 3.0
-    assert r.check(sig, q, 0, 0)[1] == "max_loss_per_trade"
+    assert r.check(sig, q, 0)[1] == "max_loss_per_trade"

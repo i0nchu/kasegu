@@ -55,7 +55,7 @@ Engine、Broker、RiskManager、PositionManager 沒有複製；backtest、paper�
 | 10 | 滑價 | 出場 0.02%，停損再加 0.03% | `fee.slippage_pct` 0.02%，停損沒有額外 0.03% | 研究停損假設較保守，但實測引擎停損滑價更大（#7） |
 | 11 | 資金費率 | [成交, 出場+1 分) 期間的費率加總 × 方向 | 結算時刻持倉時，以當下標記價格 × 數量收付 | 4 筆差異，量很小 |
 | 12 | EMA 種子 | 從 2024-10 起算 | 最近 1500 根（live `history_bars` ≤ 1500）；種子權重 (1−2/241)^1500 ≈ 4e−6 | 可忽略 |
-| 13 | 倉位與風控 | 每幣一倉、沒有全域上限、名義固定 297 USDT（以 % 計） | `max_positions`、`max_notional`（含掛單中的名義）、`max_loss_per_trade`、每日虧損與連敗暫停；數量依 lot size 向下取整 | 正式環境交易數會比研究少；比較時關閉全域上限 |
+| 13 | 倉位與風控 | 每幣一倉、沒有全域上限、名義固定 297 USDT（以 % 計） | 每幣 `margin_budget` / `max_symbol_notional`（含掛單中的名義）、`max_loss_per_trade`、全帳戶 `max_account_loss` 停止、每日虧損與連敗暫停；數量依 lot size 向下取整 | 正式環境交易數會比研究少；比較時關閉全域上限 |
 | 14 | 資料保護 | 無 | 報價逾時（`stale_after_s`）、價差、委託簿數量、未知委託狀態都會拒絕進場 | 回放中安靜時段沒有成交就沒有報價更新（1 筆 `stale_data`），live 的 bookTicker 不會有這個問題 |
 
 對應的自動化測試在 `tests/test_epr15.py`：EMA 方向與只做多、掛單距離與 tick 取整、720 根預熱、
@@ -134,7 +134,7 @@ sqlite3 data/journal-epr15.db "select json_extract(data,'$.reason'), count(*) fr
 1. 每幣每月約 2 筆成交（研究 1,918 筆 / 40 幣 / 24 月）；明顯偏多代表成交判定或波動計算有誤。
 2. `time_exit` 與 `stop_loss / exchange_stop` 比例，研究約 87% / 13%。
 3. 時間出場的實際持有時間應落在 15:00 ~ 15:02（標記價格每秒一次）。
-4. `signal` 被拒原因：`would_take`（Post-Only 會吃單）、`stale_data`、`max_positions`、`max_notional`。
+4. `signal` 被拒原因：`would_take`（Post-Only 會吃單）、`stale_data`、`max_symbol_notional`。
 5. 任何 critical 事件（`order_unknown`、`stop_lost`、`stop_rejected`、`loss_limit`、`disconnected`）。
 
 Paper 的限制：成交只看 bookTicker 的 Ask 低於掛單價，不模擬排隊位置，成交率偏樂觀；
@@ -186,8 +186,8 @@ Paper 的限制：成交只看 bookTicker 的 Ask 低於掛單價，不模擬排
 
 **`max_loss_per_trade` 只是預估**：以 `名義 × stop_loss_pct` 計算，代表價格剛好停在 −3% 時的損失。
 不包含跳空、標記價格落後、停損觸發後的市價滑價與手續費。第 4 節的回放中，真正停損的成交平均 −3.52%，最差 −6.36%，
-實際單筆損失可能是預估的兩倍以上。最壞情況要以 `max_positions × 名義 × 跳空幅度` 估算，
-因為急殺時所有掛著的買單可能同時成交（掛單中的單也計入 `max_positions` 與 `max_notional`）。
+實際單筆損失可能是預估的兩倍以上。最壞情況要以 `各幣 max_symbol_notional 總和 × 跳空幅度` 估算，
+因為急殺時所有掛著的買單可能同時成交（掛單中的單也計入該幣的 `max_symbol_notional`）；`max_account_loss` 只在之後停止策略。
 
 **小額帳戶**：啟動時以最新收盤價檢查每個幣種的下單數量，低於 `minQty` 或 `MIN_NOTIONAL` 的會發 `untradable` 警告，
 這些幣種的訊號會被 Risk Manager 拒絕，數量永遠向下取整，不會為了達到最小名義而放大。
@@ -208,7 +208,7 @@ Paper 的限制：成交只看 bookTicker 的 Ask 低於掛單價，不模擬排
 - [ ] Telegram 或 webhook 告警實際送達（critical 事件）。
 - [ ] 小額帳戶：從 `configs/epr15.example.yaml` 開始，不要用 `epr15.research.yaml`；啟動 log 沒有 `untradable`；
       資金不足時降低 `margin_budget` 或減少幣種，不要提高 `leverage`；
-      `max_positions × 名義 × 可能跳空幅度`、`max_daily_loss` 在可承受範圍內。
+      `各幣 max_symbol_notional 總和 × 可能跳空幅度`、`max_daily_loss`、`max_account_loss` 在可承受範圍內。
 - [ ] 帳戶為單向持倉、逐幣槓桿已設好，帳戶中沒有其他程式的掛單或倉位（會被接手）。
 - [ ] 確認 `live.auto_cancel_s` 的設定（預設 0）；開啟前先在 Testnet 跑 check 第 2 段。
 - [ ] 資金費率：持有 15 分鐘通常不跨結算，但跨結算時照實收付，Shadow 報表要能看到。
