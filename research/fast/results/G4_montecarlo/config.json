@@ -1,0 +1,1 @@
+{"paths": 10000, "days": 365, "block": 10, "limits": {"account": 10.0, "daily": 3.0, "streak": 3, "pause_ms": 7200000, "balance": 100.0}, "seed": 5}

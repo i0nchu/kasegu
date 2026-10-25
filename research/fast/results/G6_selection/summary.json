@@ -1,0 +1,127 @@
+{
+ "simultaneous": {
+  "trades": 1086,
+  "max_open_at_entry": 6,
+  "entries_with_3plus_open": 539,
+  "days_with_3plus_losing_coins": 53,
+  "worst20_days_net_usdt": -56.17,
+  "worst20_days_share_with_3plus_losers": 0.9,
+  "worst_day": {
+   "date": "2025-10-10",
+   "net_usdt": -7.41,
+   "losing_coins": 6
+  }
+ },
+ "fill_models_deploy6": {
+  "touch": {
+   "net_pct_per_filled_trade": 0.15785361786303767,
+   "fill_rate": 1.0
+  },
+  "queue_med": {
+   "net_pct_per_filled_trade": 0.15692544648827692,
+   "fill_rate": 0.9915811628518811
+  },
+  "queue_p90": {
+   "net_pct_per_filled_trade": -0.04165744563573049,
+   "fill_rate": 0.6942909760589319
+  }
+ },
+ "rule": [
+  {
+   "coins": "all coins",
+   "rule": "no rule",
+   "period": "design 2022-01..2024-06",
+   "trades": 4916,
+   "trades_per_month": 164.3,
+   "coin_months": 1178,
+   "net_pct_base": -0.024,
+   "day_t": -0.27,
+   "worst_day_pct": -158.0,
+   "stop_rate": 0.219
+  },
+  {
+   "coins": "all coins",
+   "rule": "no rule",
+   "period": "check 2024-07..2026-09",
+   "trades": 2982,
+   "trades_per_month": 110.4,
+   "coin_months": 865,
+   "net_pct_base": 0.221,
+   "day_t": 3.41,
+   "worst_day_pct": -63.4,
+   "stop_rate": 0.173
+  },
+  {
+   "coins": "all coins",
+   "rule": "ret30>10%",
+   "period": "design 2022-01..2024-06",
+   "trades": 1436,
+   "trades_per_month": 48.3,
+   "coin_months": 593,
+   "net_pct_base": 0.197,
+   "day_t": 1.42,
+   "worst_day_pct": -103.1,
+   "stop_rate": 0.26
+  },
+  {
+   "coins": "all coins",
+   "rule": "ret30>10%",
+   "period": "check 2024-07..2026-09",
+   "trades": 853,
+   "trades_per_month": 31.7,
+   "coin_months": 397,
+   "net_pct_base": 0.458,
+   "day_t": 4.12,
+   "worst_day_pct": -30.8,
+   "stop_rate": 0.216
+  },
+  {
+   "coins": "deploy6",
+   "rule": "no rule",
+   "period": "design 2022-01..2024-06",
+   "trades": 769,
+   "trades_per_month": 25.8,
+   "coin_months": 142,
+   "net_pct_base": 0.11,
+   "day_t": 1.05,
+   "worst_day_pct": -28.1,
+   "stop_rate": 0.176
+  },
+  {
+   "coins": "deploy6",
+   "rule": "no rule",
+   "period": "check 2024-07..2026-09",
+   "trades": 258,
+   "trades_per_month": 9.8,
+   "coin_months": 101,
+   "net_pct_base": 0.257,
+   "day_t": 1.21,
+   "worst_day_pct": -37.4,
+   "stop_rate": 0.124
+  },
+  {
+   "coins": "deploy6",
+   "rule": "ret30>10%",
+   "period": "design 2022-01..2024-06",
+   "trades": 206,
+   "trades_per_month": 7.5,
+   "coin_months": 66,
+   "net_pct_base": 0.407,
+   "day_t": 2.33,
+   "worst_day_pct": -15.6,
+   "stop_rate": 0.209
+  },
+  {
+   "coins": "deploy6",
+   "rule": "ret30>10%",
+   "period": "check 2024-07..2026-09",
+   "trades": 46,
+   "trades_per_month": 1.8,
+   "coin_months": 35,
+   "net_pct_base": 0.562,
+   "day_t": 1.98,
+   "worst_day_pct": -5.7,
+   "stop_rate": 0.174
+  }
+ ]
+}
