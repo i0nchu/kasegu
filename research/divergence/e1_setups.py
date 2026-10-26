@@ -33,7 +33,9 @@ HORIZON = 120
 @nb.njit(cache=True)
 def setups(h, l, c, macd, atr, piv, trough=False):
     """piv[i] = pivot-high bar confirmed at i (or -1). Returns rows
-    (t, a, b, cidx, L0, H1, L1, M1, label, label_bar, div_at_break)."""
+    (t, a, b, cidx, L0, H1, L1, M1, label, label_bar, div_at_break).
+    trough=True (refined mode, E5 on): L1 must be a confirmed pivot low (K bars each side) before t,
+    and H1 must be the highest high since L0."""
     n = len(h)
     out = np.full((n // 4 + 1, 11), np.nan)
     k = 0
@@ -50,6 +52,14 @@ def setups(h, l, c, macd, atr, piv, trough=False):
         A = atr[b]
         if A != A or A <= 0 or (H1 - L0) < 2 * A or a >= b - 2:
             continue
+        if trough:  # refined mode: H1 must be the top of the leg from L0 (no higher high in between)
+            top = True
+            for j in range(a, b):
+                if h[j] > H1:
+                    top = False
+                    break
+            if not top:
+                continue
         M1 = -1e18
         for j in range(b - K, b + K + 1):
             if macd[j] > M1:
