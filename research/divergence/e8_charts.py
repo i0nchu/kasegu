@@ -23,18 +23,23 @@ plt.rcParams["axes.unicode_minus"] = False
 
 BIG = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT", "DOGEUSDT", "ADAUSDT", "LINKUSDT",
        "AVAXUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "SUIUSDT", "APTUSDT", "ARBUSDT"]  # fmt: skip
-WHY = {0: "時間出場", 1: "止損", 2: "頸線平半倉，餘倉保本", 3: "頸線止盈", 4: "頸線平半倉，餘倉時間出場",
-       5: "跌破 L0 且 MACD 創新低（無背離）出場"}  # fmt: skip
-TFH = {"1h": 1, "4h": 4}
+WHY = {0: "時間出場", 1: "止損", 2: "TP1 平半倉，餘倉保本", 3: "止盈", 4: "TP1 平半倉，餘倉時間出場",
+       5: "跌破第一底且 MACD 創新低（無背離）出場"}  # fmt: skip
+TFH = {"15m": 0.25, "30m": 0.5, "1h": 1, "2h": 2, "4h": 4, "8h": 8, "12h": 12, "1d": 24}
 
 
 def ts(x):
     return pd.to_datetime(x, unit="ms")
 
 
-def chart(r, path, note=""):
+def chart(r, path, note="", disp=None):
+    """disp: candle timeframe for display (defaults to the signal timeframe)."""
+    disp = disp or r.tf
+    if disp == "auto":  # candle size from the swing's own duration: whole structure in about 60-90 candles
+        span = (r.t_out - r.t0) / 3_600_000
+        disp = next((k for k, v in TFH.items() if v >= TFH[r.tf] and span / v <= 70), "1d")
     X = C.load(r.sym)
-    n5 = 12 * TFH[r.tf]
+    n5 = int(12 * TFH[disp])
     B = C.resample(X, n5)
     t = B["t"]
     i0 = max(np.searchsorted(t, r.t0) - 8, 0)
@@ -42,9 +47,13 @@ def chart(r, path, note=""):
     sl = slice(i0, i1)
     tt = pd.to_datetime(t[sl], unit="ms")
     o, h, l, c = B["o"][sl], B["h"][sl], B["l"][sl], B["c"][sl]
-    ml, _ = C.macd(B["c"])
+    S = C.resample(X, int(12 * TFH[r.tf]))  # MACD on the signal timeframe (the one the rules use)
+    ms = (S["t"] >= t[i0]) & (S["t"] < t[min(i1, len(t) - 1)] + n5 * C.M5)
+    ts_ = pd.to_datetime(S["t"][ms], unit="ms")
+    ml, _ = C.macd(S["c"])
     sig = C.ema(ml, 9)
-    bw = pd.Timedelta(hours=TFH[r.tf])
+    bw = pd.Timedelta(hours=TFH[disp])
+    sb = pd.Timedelta(hours=TFH[r.tf])  # signal bar
     fig, (ax, bx) = plt.subplots(2, 1, figsize=(13, 7.5), sharex=True, gridspec_kw={"height_ratios": [3, 1]})
     for k in range(len(tt)):
         col = "#26a69a" if c[k] >= o[k] else "#ef5350"
@@ -52,7 +61,7 @@ def chart(r, path, note=""):
         ax.bar(tt[k] + bw / 2, abs(c[k] - o[k]) or 1e-12, bottom=min(o[k], c[k]), width=bw * 0.7, color=col)
 
     s = r.side
-    tp = r.H1
+    tp = getattr(r, "tp1", r.H1)
     # position tool: box from entry to exit
     x0, x1 = ts(r.t_in), max(ts(r.t_out), ts(r.t_in) + 4 * bw)
     w = x1 - x0
@@ -60,14 +69,17 @@ def chart(r, path, note=""):
     ax.add_patch(Rectangle((x0, min(r.px_in, r.stop)), w, abs(r.px_in - r.stop), color="#ef5350", alpha=0.22, lw=0))
     ax.hlines(r.px_in, x0, x1, color="#455a64", lw=1.2)
     rr = abs(tp - r.px_in) / abs(r.px_in - r.stop)
-    ax.text(x1, tp, f" 目標 {tp:.4g} ({100 * s * (tp / r.px_in - 1):+.2f}%)", va="center", fontsize=8, color="#00796b")
+    ax.text(x1, tp, f" TP1 {tp:.4g} ({100 * s * (tp / r.px_in - 1):+.2f}%)", va="center", fontsize=8, color="#00796b")
     ax.text(x1, r.stop, f" 止損 {r.stop:.4g} ({100 * s * (r.stop / r.px_in - 1):+.2f}%)", va="center", fontsize=8,
             color="#c62828")  # fmt: skip
     ax.text(x1, r.px_in, f" {'做多' if s > 0 else '做空'} {r.px_in:.4g}  盈虧比 {rr:.2f}", va="center", fontsize=8)
-    if r.exit == "partial":
+    if r.exit in ("partial", "body_half"):
         t2 = r.H1 + (r.H1 - r.L0)
-        ax.hlines(t2, x0, x1, color="#00796b", ls=":", lw=1)
-        ax.text(x1, t2, f" 目標2 {t2:.4g}", va="center", fontsize=8, color="#00796b")
+        if min(np.nanmin(l), r.stop) <= t2 <= max(np.nanmax(h), r.stop):
+            ax.hlines(t2, x0, x1, color="#00796b", ls=":", lw=1)
+            ax.text(x1, t2, f" TP2 {t2:.4g}", va="center", fontsize=8, color="#00796b")
+        else:  # far outside the chart: note it on the entry line instead
+            ax.text(x1, r.px_in, f"\n\n TP2 {t2:.4g}（圖外）", va="center", fontsize=8, color="#00796b")
     # structure
     ax.plot([ts(r.t0) + bw / 2, ts(r.ta) + bw / 2, ts(r.tb) + bw / 2], [r.H0, r.L0, r.H1], color="#1565c0", lw=1,
             alpha=0.6)  # fmt: skip
@@ -81,7 +93,7 @@ def chart(r, path, note=""):
     z0, z1 = r.L0, r.L0 + 0.5 * (r.H1 - r.L0)
     ax.add_patch(Rectangle((ts(r.tb), min(z0, z1)), x1 - ts(r.tb), abs(z1 - z0), color="#fff59d", alpha=0.35, lw=0))
     ax.text(ts(r.tb), z1, "入場區（中點～第一底/頂）", fontsize=7, color="#9e9d24", va="bottom" if s > 0 else "top")
-    ax.axvline(ts(r.t) + bw, color="grey", ls=":", lw=0.8)
+    ax.axvline(ts(r.t) + sb, color="grey", ls=":", lw=0.8)
     ax.scatter([ts(r.t_in)], [r.px_in], marker="^" if s > 0 else "v", s=130, color="black", zorder=5)
     ax.scatter([ts(r.t_out)], [r.px_out], marker="x", s=130, color="black", zorder=5)
     ax.annotate(f"進場 {ts(r.t_in):%Y-%m-%d %H:%M}\n@ {r.px_in:.4g}", (ts(r.t_in), r.px_in), textcoords="offset points",
@@ -91,19 +103,23 @@ def chart(r, path, note=""):
                 textcoords="offset points", xytext=(10, 22 if r.net > 0 else -34), ha="left", fontsize=8,
                 bbox={"boxstyle": "round", "fc": "white", "alpha": 0.8})  # fmt: skip
     res = "獲利" if r.net > 0 else "虧損"
-    ax.set_title(f"{r.sym} {r.tf} {'做多（雙底）' if s > 0 else '做空（雙頂）'}  {res} {100 * r.net:+.2f}%（含成本）  "
-                 f"{WHY.get(int(r.why), '')}  {note}", fontsize=11)  # fmt: skip
+    why = WHY.get(int(r.why), "")
+    if s < 0:
+        why = why.replace("跌破第一底且 MACD 創新低", "突破第一頂且 MACD 創新高")
+    ax.set_title(f"{r.sym} 訊號 {r.tf}／K 線 {disp} {'做多（雙底）' if s > 0 else '做空（雙頂）'}  {res} {100 * r.net:+.2f}%（含成本）  "
+                 f"{why}  {note}", fontsize=11)  # fmt: skip
     lo, hi = min(np.nanmin(l), r.stop, tp), max(np.nanmax(h), r.stop, tp)
     ax.set_ylim(lo - 0.04 * (hi - lo), hi + 0.06 * (hi - lo))
-    bx.plot(tt + bw / 2, ml[sl], color="black", lw=1, label="MACD")
-    bx.plot(tt + bw / 2, sig[sl], color="orange", lw=1, label="signal")
-    bx.bar(tt + bw / 2, (ml - sig)[sl], width=bw * 0.7, color="#90a4ae")
+    bx.plot(ts_ + sb / 2, ml[ms], color="black", lw=1, label=f"MACD（{r.tf}）")
+    bx.plot(ts_ + sb / 2, sig[ms], color="orange", lw=1, label="signal")
+    bx.bar(ts_ + sb / 2, (ml - sig)[ms], width=sb * 0.7, color="#90a4ae")
     bx.axhline(0, color="grey", lw=0.6)
     bx.axhline(r.M0, color="#1565c0", ls=":", lw=0.8, label="M0（第一底/頂附近的 MACD 極值）")
-    bx.axvline(ts(r.t) + bw, color="grey", ls=":", lw=0.8)
+    bx.axvline(ts(r.t) + sb, color="grey", ls=":", lw=0.8)
     bx.axvline(ts(r.t_in), color="black", ls=":", lw=0.8)
     bx.legend(loc="upper left", fontsize=7)
-    bx.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%m-%d"))
+    span = tt[-1] - tt[0]
+    bx.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%m-%d" if span > pd.Timedelta(days=4) else "%m-%d %H:%M"))
     fig.tight_layout()
     fig.savefig(path, dpi=110)
     plt.close(fig)

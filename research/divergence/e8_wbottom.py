@@ -108,8 +108,9 @@ def divfail(c, macd, i, L0, M0, n_tf):
 
 
 @nb.njit(cache=True)
-def sim(o, h, l, c, fund, j0, jmax, lim, H1, L0, sp, t2, jx, hold, cost):
-    """Long only (short side: mirrored prices, returns use |entry price|). Limit fill, then stop / H1 / t2 / jx / time.
+def sim(o, h, l, c, fund, j0, jmax, lim, H1, L0, sp, t2, jx, hold, cost, tp1):
+    """Long only (short side: mirrored prices, returns use |entry price|). Limit fill, then stop / tp1 / t2 / jx / time.
+    The setup is cancelled if price breaks the neckline H1 before the fill.
     why: 0 time, 1 stop, 2 half at H1 then breakeven, 3 target, 4 half at H1 then time, 5 divfail exit."""
     n = len(o)
     E = len(j0)
@@ -163,8 +164,8 @@ def sim(o, h, l, c, fund, j0, jmax, lim, H1, L0, sp, t2, jx, hold, cost):
                 out = min(stop, op)
                 w = 2 if hit1 else 1
                 break
-            if not hit1 and hh >= H1[e]:
-                f1 = max(H1[e], op)
+            if not hit1 and hh >= tp1[e]:
+                f1 = max(tp1[e], op)
                 if t2[e] != t2[e]:
                     out = f1
                     w = 3
@@ -237,7 +238,7 @@ def run_sym(sym, K=3):
                     for ex, t2 in (("full", np.full(len(i), np.nan)), ("partial", H1 + rng)):
                         for dfx in (0, 1):
                             r = sim(ho, hh, hl, hc, fund, j, jmax, lim, H1, L0, sp, t2,
-                                    jx if dfx else np.full(len(i), -1, np.int64), HOLD * n5, C.COST)  # fmt: skip
+                                    jx if dfx else np.full(len(i), -1, np.int64), HOLD * n5, C.COST, H1)  # fmt: skip
                             d = pd.DataFrame(base)
                             d["x"], d["stop_k"], d["exit"], d["divfail"] = x, st, ex, dfx
                             d["net"] = r[0]
