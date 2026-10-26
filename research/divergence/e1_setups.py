@@ -31,7 +31,7 @@ HORIZON = 120
 
 
 @nb.njit(cache=True)
-def setups(h, l, c, macd, atr, piv):
+def setups(h, l, c, macd, atr, piv, trough=False):
     """piv[i] = pivot-high bar confirmed at i (or -1). Returns rows
     (t, a, b, cidx, L0, H1, L1, M1, label, label_bar, div_at_break)."""
     n = len(h)
@@ -75,7 +75,8 @@ def setups(h, l, c, macd, atr, piv):
             if L1 <= L0:
                 break
             if (j >= 2 and macd[j] > macd[j - 1] and macd[j - 1] <= macd[j - 2]
-                    and macd[j] < M1 and H1 - L1 >= atr[j] and c[j] < H1 and ci < j):
+                    and macd[j] < M1 and H1 - L1 >= atr[j] and c[j] < H1 and ci < j
+                    and (not trough or (ci + K <= j and ci - b >= K))):
                 t = j
                 break
         if t < 0:
