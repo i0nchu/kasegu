@@ -1,0 +1,23 @@
+{
+ "threshold_now": {
+  "macd_threshold": -0.000714249369762568,
+  "macd_cvd_threshold": 0.6965950581642185
+ },
+ "threshold_D7": {
+  "macd_threshold": -0.0007142494,
+  "macd_cvd_threshold": 0.6965950582
+ },
+ "trunc_tested": 1697,
+ "trunc_mismatch": 0,
+ "lag_not_3": 0,
+ "entry_before_signal_close": 0,
+ "events": 22152,
+ "ledger_now": 1590,
+ "ledger_d7": 1590,
+ "ledger_both": 1590,
+ "max_net_diff": 0.0,
+ "bp_now": 82.84931748763894,
+ "bp_d7": 82.84931748763894,
+ "data_end_exits": 10,
+ "data_end_bp_sum": 1.5904385643177212
+}
