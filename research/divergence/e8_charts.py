@@ -25,7 +25,7 @@ BIG = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT", "DOGEUSDT", "ADAUS
        "AVAXUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "NEARUSDT", "SUIUSDT", "APTUSDT", "ARBUSDT"]  # fmt: skip
 WHY = {0: "時間出場", 1: "止損", 2: "TP1 平半倉，餘倉保本", 3: "止盈", 4: "TP1 平半倉，餘倉時間出場",
        5: "跌破第一底且 MACD 創新低（無背離）出場"}  # fmt: skip
-TFH = {"15m": 0.25, "30m": 0.5, "1h": 1, "2h": 2, "4h": 4, "8h": 8, "12h": 12, "1d": 24}
+TFH = {"5m": 1 / 12, "15m": 0.25, "30m": 0.5, "1h": 1, "2h": 2, "4h": 4, "6h": 6, "8h": 8, "12h": 12, "1d": 24}
 
 
 def ts(x):
@@ -90,7 +90,8 @@ def chart(r, path, note="", disp=None):
                     weight="bold", color="#1565c0")  # fmt: skip
     ax.hlines(r.H1, ts(r.tb), x1, color="#1565c0", ls="--", lw=0.8)
     ax.hlines(r.L0, ts(r.ta), x1, color="#1565c0", ls="--", lw=0.8)
-    z0, z1 = r.L0, r.L0 + 0.5 * (r.H1 - r.L0)
+    z0 = r.L0 - (0.15 if hasattr(r, "rr") else 0) * (r.H1 - r.L0)  # E10 entries may sit slightly beyond L0
+    z1 = r.L0 + 0.5 * (r.H1 - r.L0)
     ax.add_patch(Rectangle((ts(r.tb), min(z0, z1)), x1 - ts(r.tb), abs(z1 - z0), color="#fff59d", alpha=0.35, lw=0))
     ax.text(ts(r.tb), z1, "入場區（中點～第一底/頂）", fontsize=7, color="#9e9d24", va="bottom" if s > 0 else "top")
     ax.axvline(ts(r.t) + sb, color="grey", ls=":", lw=0.8)
