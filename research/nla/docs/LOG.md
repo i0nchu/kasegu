@@ -114,7 +114,7 @@
 已知限制：代號在無斷檔情況下被新資產接手（例如 2022 年 LUNA → LUNC 改名、新 LUNA 沿用代號）
 偵測不到；用價格跳空檢查可以補，留待 NLA-02 處理異常值時一起看。
 
-### 開發／驗證／保留期切分（待使用者決定，NLA-02 開始前凍結）
+### 開發／驗證／保留期切分
 
 因為類別集中在不同年份，純時間切分（例如 dev < 2024-07、val 2024-07～2025-09、hold 2025-10～2026-09）
 會讓 spot_first 幾乎沒有驗證與保留資料（8 / 1 個），perp_first 的開發集只有 25 個。
@@ -128,5 +128,20 @@
 | spot_after_perp | 4 | 38 | 31 |
 | 合計 | 795 | 382 | 362 |
 
-產出：`results/N1_dataset/`（events_by_year_category.csv、delisting_by_year.csv、quality_flags.csv、
+**使用者決定（2026-10-28）：各類別各自按時間 50/25/25。** 每個類別內依首次成交時間排序（同一資產的
+現貨與合約事件綁在一起），最早 50% = dev、接著 25% = val、最新 25% = hold；不足 8 個事件的類別（relist）
+全歸 dev。名單凍結在 `results/N1_dataset/split.csv`（`n5_split.py`），在跑任何報酬分析之前 commit。
+規則：NLA-02～05 的程式只讀 dev（val 只在要確認方向時使用，並在 LOG 記下每次使用），hold 在 NLA-06 前不讀。
+
+| 類別 | dev | val | hold | hold 期間 |
+|---|---|---|---|---|
+| perp_after_spot | 135 | 65 | 65 | 2023-11～2026-07 |
+| perp_first | 246 | 122 | 121 | 2026-06～2026-09 |
+| spot_after_perp | 38 | 19 | 16 | 2026-01～2026-09 |
+| spot_first | 220 | 116 | 116 | 2021-06～2026-03 |
+| spot_perp_same_day | 130 | 66 | 62 | 2025-05～2026-07 |
+| relist | 2 | 0 | 0 | — |
+| 合計 | 771 | 388 | 380 | |
+
+產出：`results/N1_dataset/`（split.csv、events_by_year_category.csv、delisting_by_year.csv、quality_flags.csv、
 perp_after_spot_lag_days.csv、listing_events.csv.gz）。
