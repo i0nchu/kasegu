@@ -1,0 +1,16 @@
+,all,eligible
+archive_start,19,0
+no_panel_pair,180,157
+panel_quote_later,1,0
+first_quote_non_usd,616,591
+window_lt_30d,95,53
+missing_min_d1_gt5pct,23,6
+first_open_far_from_vwap1h,516,511
+microsecond_ts,221,123
+multiplier_contract,15,15
+relist,9,2
+leveraged_token,54,0
+stable_or_fiat,34,0
+tokenized_stock,87,0
+synthetic_usd,167,157
+no_bars,13,0
