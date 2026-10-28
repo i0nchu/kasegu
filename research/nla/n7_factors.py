@@ -49,12 +49,13 @@ def factors(k: np.ndarray, t0: float, ta: float) -> dict:
     )
 
 
-def build() -> pd.DataFrame:
+def build(which: str = "dev") -> pd.DataFrame:
     sp = pd.read_csv(RES.parent / "N1_dataset" / "split.csv")
     ev = pd.read_csv(OUT / "events.csv").merge(sp[["event_id", "split"]], on="event_id")
-    ev = ev[ev["split"] == "dev"]
+    assert which in ("dev", "val"), "the holdout is not read before NLA-06"
+    ev = ev[ev["split"] == which]
     dup = (ev["listing_category"] == "spot_perp_same_day") & (ev["market_type"] == "spot")
-    print("dev events", len(ev), "- same-day spot duplicates dropped", int(dup.sum()))
+    print(which, "events", len(ev), "- same-day spot duplicates dropped", int(dup.sum()))
     ev = ev[~dup]
     at_, ax = alt_basket()
     rows = []
@@ -94,7 +95,7 @@ def build() -> pd.DataFrame:
         on="event_id",
     )
     f["month"] = pd.to_datetime(f["first_trade_time"], unit="ms").dt.strftime("%Y-%m")
-    f.to_csv(OUT / "factors_dev.csv", index=False)
+    f.to_csv(OUT / f"factors_{which}.csv", index=False)
     return f
 
 
