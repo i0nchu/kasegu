@@ -1,0 +1,23 @@
+{
+ "engine_events": 1959,
+ "backtest_events": 1959,
+ "matched": 1959,
+ "only_engine": 0,
+ "only_backtest": 0,
+ "net_equal": 1959,
+ "net_compared": 1959,
+ "max_abs_net_diff": 5.551115123125783e-16,
+ "macd_max_rel_diff": 0.0004119622940794097,
+ "rule_div_s4_flips": 0,
+ "rule_macd_flips": 0,
+ "div_s4_engine": 160,
+ "div_s4_backtest": 160,
+ "div_s4_same": 160,
+ "macd_only_engine": 195,
+ "macd_only_backtest": 195,
+ "macd_only_same": 194,
+ "all_highs_engine": 254,
+ "all_highs_backtest": 255,
+ "all_highs_same": 250,
+ "basket_bars": 1284
+}
