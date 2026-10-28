@@ -127,6 +127,8 @@ class BinanceSource:
         for s, info in self.symbols(day + DAY).items():
             if info.get("onboardDate", 0) > day - F["universe_min_age_days"] * DAY:
                 continue
+            if info.get("status") == "PENDING_TRADING":  # not launched: klines return -1122, and no bars anyway
+                continue
             d = self.daily(s, day)
             if len(d) < F["universe_min_age_days"] or d.t.iloc[-1] != day - DAY:
                 continue
