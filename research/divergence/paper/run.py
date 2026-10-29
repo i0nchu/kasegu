@@ -34,7 +34,7 @@ def main():
     def log(m):
         line = f"{pd.Timestamp.now(tz='UTC'):%Y-%m-%d %H:%M:%S} {m}"
         print(line, flush=True)
-        with open(d / "run.log", "a") as fh:
+        with open(d / "run.log", "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
 
     start = int(pd.Timestamp(F["paper_start"]).value // 10**6)

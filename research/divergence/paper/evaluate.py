@@ -128,10 +128,10 @@ def main(d, quiet=False):
             row["div_s4-all_highs_bp"] = row["div_s4"]["bp"] - row["all_highs"]["bp"]
             M["regimes"][val] = row
     M["verdict"] = verdict(M)
-    (d / "metrics.json").write_text(json.dumps(M, indent=1, default=float, ensure_ascii=False))
+    (d / "metrics.json").write_text(json.dumps(M, indent=1, default=float, ensure_ascii=False), encoding="utf-8")
     report(d, M)
     if not quiet:
-        print((d / "report.md").read_text())
+        print((d / "report.md").read_text(encoding="utf-8"))
 
 
 def report(d, M):
@@ -164,7 +164,7 @@ def report(d, M):
     u = M["uncapped"]
     out += ["", "不設持倉上限（所有符合規則的訊號，次要參考）：" + "、".join(
         f"{NAMES[lg]} {u[lg].get('n', 0)} 筆 {f(u[lg].get('bp', np.nan))} bp" for lg in LEDGERS)]  # fmt: skip
-    (d / "report.md").write_text("\n".join(out) + "\n")
+    (d / "report.md").write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
