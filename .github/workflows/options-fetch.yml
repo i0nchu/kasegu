@@ -18,7 +18,7 @@ jobs:
       - run: |
           git config user.name ion
           git config user.email jiaheng921122@gmail.com
-          git add research/options/data
+          git add -f research/options/data
           git commit -m "Add fetched option data" || exit 0
           git pull --rebase origin claude/project-thread-5yjn5c
           git push origin HEAD:claude/project-thread-5yjn5c
