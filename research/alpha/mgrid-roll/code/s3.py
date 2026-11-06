@@ -118,15 +118,15 @@ if __name__ == '__main__':
         rows = []
         for tag in ('', '_stress'):
             T = prep(split, tag); days = np.arange(T.day.min(), T.day.max() + 1)
-            K, L = cfg['K'], cfg['L']
-            out = {}
-            for name, sig, tm, lo in (('FROZEN', cfg['sig'], cfg['timing'], False), ('MGT', 'RV3', False, False), ('LONG', 'RV3', False, True)):
-                eq, fr, led = run(T, sig, K, L, days, tm, lo); out[name] = fr
-                rows.append(dict(cost='stress' if tag else 'base', variant=name, **summ(eq, fr, led, periods), **boot(fr)))
-                if name == 'FROZEN':
-                    led.to_csv(f'{res}/S4_{split}{tag}_ledger.csv.gz', index=False); eq.to_csv(f'{res}/S4_{split}{tag}_equity.csv')
-            rows[-3]['diff_vs_MGT_t'] = nw_t((out['FROZEN'] - out['MGT']).values); rows[-3]['diff_vs_MGT_mean'] = (out['FROZEN'] - out['MGT']).mean()
-            rows[-3]['diff_vs_LONG_t'] = nw_t((out['FROZEN'] - out['LONG']).values); rows[-3]['diff_vs_LONG_mean'] = (out['FROZEN'] - out['LONG']).mean()
+            for K, L, cid in ((cfg['K'], cfg['L'], cfg['id']), (cfg['secondary']['K'], cfg['secondary']['L'], cfg['secondary']['id'])):
+                out = {}
+                for name, sig, tm, lo in (('FROZEN', cfg['sig'], cfg['timing'], False), ('MGT', 'RV3', False, False), ('LONG', 'RV3', False, True)):
+                    eq, fr, led = run(T, sig, K, L, days, tm, lo); out[name] = fr
+                    rows.append(dict(cfg=cid, cost='stress' if tag else 'base', variant=name, **summ(eq, fr, led, periods), **boot(fr)))
+                    if name == 'FROZEN':
+                        led.to_csv(f'{res}/S4_{split}{tag}_{cid}_ledger.csv.gz', index=False); eq.to_csv(f'{res}/S4_{split}{tag}_{cid}_equity.csv')
+                rows[-3]['diff_vs_MGT_t'] = nw_t((out['FROZEN'] - out['MGT']).values); rows[-3]['diff_vs_MGT_mean'] = (out['FROZEN'] - out['MGT']).mean()
+                rows[-3]['diff_vs_LONG_t'] = nw_t((out['FROZEN'] - out['LONG']).values); rows[-3]['diff_vs_LONG_mean'] = (out['FROZEN'] - out['LONG']).mean()
         R = pd.DataFrame(rows); pd.set_option('display.width', 250)
         print(f'{split} frozen {cfg}'); print(R.round(4).to_string(index=False))
         R.to_csv(f'{res}/S4_{split}_summary.csv', index=False)

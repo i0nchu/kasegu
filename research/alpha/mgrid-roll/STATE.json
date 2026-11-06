@@ -2,47 +2,52 @@
   "schema_version": 1,
   "study_id": "mgrid-roll",
   "created_utc": "2026-11-06T11:09:44.909551+00:00",
-  "phase": "S0_THESIS",
-  "decision": "PENDING",
+  "phase": "S4_VALIDATION",
+  "decision": "CONTINUE",
   "splits": {
     "dev": {
-      "definition": null,
-      "status": "UNKNOWN",
-      "accesses": []
+      "definition": "2020-07-01..2023-06-27",
+      "status": "USED",
+      "accesses": [
+        "R001-R005"
+      ]
     },
     "val": {
-      "definition": null,
-      "status": "UNKNOWN",
-      "accesses": []
+      "definition": "2023-07-08..2024-12-28",
+      "status": "CONSUMED (previously by mgrid-trend; R006 non-independent recompute)",
+      "accesses": [
+        "R006"
+      ]
     },
     "hold": {
-      "definition": null,
-      "status": "UNKNOWN",
+      "definition": "2025-01-08..2026-09-27",
+      "status": "UNTOUCHED",
       "accesses": []
     },
     "forward": {
       "definition": null,
-      "status": "UNKNOWN",
+      "status": "NOT_STARTED",
       "accesses": []
     }
   },
   "candidate": {
-    "id": null,
-    "code_commit": null,
-    "config_sha256": null,
-    "prereg_commit": null
+    "id": "MGR-K1-L3",
+    "code_commit": "aacf54b",
+    "config_sha256": "e392ac6db187ba7c (first 16)",
+    "prereg_commit": "84a956d"
   },
   "phase_gates": {
-    "S0": false,
-    "S1": false,
-    "S2": false,
-    "S3": false,
+    "S0": true,
+    "S1": true,
+    "S2": true,
+    "S3": true,
     "S4": false,
     "S5": false,
     "S6": false,
     "S7": false
   },
   "notes": [
-    "Record every evaluation and split access before advancing phases."
+    "Record every evaluation and split access before advancing phases.",
+    "Selection composite and BTCRV7 timing failed S3 incremental gate; candidate = MGT signal + compounding K1 L3.12. Hold needs user OK."
   ]
 }
