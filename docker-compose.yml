@@ -43,3 +43,27 @@ services:
       options:
         max-size: 10m
         max-file: "5"
+
+  # One-shot leveraged bet to double the stake, paper only (docs/bold.md). Not started by default:
+  #   cp configs/bold.example.yaml configs/bold.yaml
+  #   docker compose --profile bold up -d --build kasegu-bold
+  kasegu-bold:
+    profiles: ["bold"]
+    image: kasegu:local
+    build: .
+    restart: unless-stopped
+    command: ["--mode", "bold-paper", "--config", "configs/bold.yaml"]
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data  # data/bold: state.json, tries.csv, status.json
+    healthcheck:
+      test: ["CMD", "python", "-m", "kasegu.health", "data/bold/status.json", "900"]
+      interval: 60s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
