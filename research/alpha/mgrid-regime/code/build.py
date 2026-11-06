@@ -7,11 +7,12 @@ if len(sys.argv) > 2 and sys.argv[2] == 'stress':
     KW = dict(pen=0.002, maker=0.0004, taker=0.001, slip_in=0.0004, slip_out=0.001)
 if len(sys.argv) > 2 and sys.argv[2] == 'tpsame':
     KW = dict(tp_same_bar=True)
-TAG = '' if len(sys.argv) < 3 else '_' + sys.argv[2]
+TAG = '' if len(sys.argv) < 3 or sys.argv[2] == 'base' else '_' + sys.argv[2]
+MARGINS = (("", mg.MARGIN), ("N", 25 / 104), ("K2", 50 / 104), ("K1", 100 / 104))
 
 def one(sym):
     try:
-        return mg.coin_table(sym, SPLIT, **KW)
+        return mg.coin_table(sym, SPLIT, margins=MARGINS, **KW)
     except Exception as e:
         print('ERR', sym, e); return None
 
