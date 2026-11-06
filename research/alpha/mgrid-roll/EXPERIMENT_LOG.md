@@ -14,4 +14,8 @@
 | UTC | Split | 操作 | 已看結果？ |
 |---|---|---|---|
 | 2026-11-06 11:15 | val | R006 一次性重算（MGR-K1-L3、MGR-K3-L3 + MGT/LONG 對照，基準與壓測成本） | 是（val 先前已被 mgrid-trend 消耗；本次為非獨立重算） |
-| 2026-11-06 11:20 | hold | R007 使用者同意（決策卡選「兩個都做」）後一次性回測 MGR-K1-L3 / MGR-K3-L3 + MGT/LONG 對照；判定沿用 HYPOTHESIS.md（CAGR>0、maxDD>−60%、勝過同 sizing 永遠做多） | 執行中 |
+| 2026-11-06 11:20 | hold | R007 使用者同意（決策卡選「兩個都做」）後一次性回測 MGR-K1-L3 / MGR-K3-L3 + MGT/LONG 對照；判定沿用 HYPOTHESIS.md（CAGR>0、maxDD>−60%、勝過同 sizing 永遠做多） | 是（hold 已消耗） |
+
+| ID | UTC | Split | 變體 | 結果 | 判定 |
+|---|---|---|---|---|---|
+| R007 | 2026-11-06 11:25 | **hold**（唯一一次） | MGR-K1-L3、MGR-K3-L3 + MGT/LONG（results/S4_hold_summary.csv） | K1：100 → 32 USD（壓測 23），2025H1 −68%，maxDD −79%，最差單日 −61%；權益跌破 33 USD 後名目不到 104 無法再開單。K3：100 → 28（壓測 26），maxDD −78%。最大虧損都來自熊市中做空網格被軋空（PNUT 2025-02-28、ARC 03-19、OM 04-15、JELLYJELLY 11-07）與 ALPACA 做多爆倉。對永遠做多：K1 LONG 歸零、K3 LONG 32 | **REJECT**（CAGR ≤ 0） |

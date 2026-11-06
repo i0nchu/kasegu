@@ -3,7 +3,7 @@
   "study_id": "mgrid-roll",
   "created_utc": "2026-11-06T11:09:44.909551+00:00",
   "phase": "S4_VALIDATION",
-  "decision": "CONTINUE",
+  "decision": "REJECT",
   "splits": {
     "dev": {
       "definition": "2020-07-01..2023-06-27",
@@ -21,8 +21,10 @@
     },
     "hold": {
       "definition": "2025-01-08..2026-09-27",
-      "status": "UNTOUCHED",
-      "accesses": []
+      "status": "CONSUMED",
+      "accesses": [
+        "R007 2026-11-06 user-approved one-shot"
+      ]
     },
     "forward": {
       "definition": null,
@@ -49,6 +51,7 @@
   "notes": [
     "Record every evaluation and split access before advancing phases.",
     "Selection composite and BTCRV7 timing failed S3 incremental gate; candidate = MGT signal + compounding K1 L3.12. Hold needs user OK.",
-    "val previously consumed by mgrid-trend; R006 is a non-independent recompute."
+    "val previously consumed by mgrid-trend; R006 is a non-independent recompute.",
+    "Hold REJECT: K1 100->32, K3 100->28; short grids squeezed in 2025 alt bear."
   ]
 }
