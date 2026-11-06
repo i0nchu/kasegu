@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "study_id": "mgrid-regime",
+  "created_utc": "2026-11-06T10:17:36.979032+00:00",
+  "phase": "S1_DATA",
+  "decision": "PENDING",
+  "splits": {
+    "dev": {
+      "definition": "episode start 2020-07-01..2023-06-27 UTC, ends by 2023-06-30",
+      "status": "OPEN_FOR_RESEARCH",
+      "accesses": []
+    },
+    "val": {
+      "definition": "episode start 2023-07-08..2024-12-28 UTC (7d embargo)",
+      "status": "UNSEEN_FOR_THIS_HYPOTHESIS",
+      "accesses": []
+    },
+    "hold": {
+      "definition": "episode start 2025-01-08..2026-09-27 UTC (7d embargo)",
+      "status": "UNSEEN_FOR_THIS_HYPOTHESIS; period seen by other studies",
+      "accesses": []
+    },
+    "forward": {
+      "definition": "2026-10 onward",
+      "status": "UNSEEN",
+      "accesses": []
+    }
+  },
+  "candidate": {
+    "id": null,
+    "code_commit": null,
+    "config_sha256": null,
+    "prereg_commit": null
+  },
+  "phase_gates": {
+    "S0": true,
+    "S1": false,
+    "S2": false,
+    "S3": false,
+    "S4": false,
+    "S5": false,
+    "S6": false,
+    "S7": false
+  },
+  "notes": [
+    "Record every evaluation and split access before advancing phases."
+  ]
+}
