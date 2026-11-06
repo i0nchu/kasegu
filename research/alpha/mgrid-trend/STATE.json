@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "study_id": "mgrid-trend",
+  "created_utc": "2026-11-06T10:38:38.428750+00:00",
+  "phase": "S3_STRATEGY",
+  "decision": "INCONCLUSIVE",
+  "splits": {
+    "dev": {
+      "definition": "2020-07-01..2023-06-27",
+      "status": "CONSUMED",
+      "accesses": [
+        "mgrid-regime E001-E007",
+        "T001-T003"
+      ]
+    },
+    "val": {
+      "definition": "2023-07-08..2024-12-28",
+      "status": "CONSUMED",
+      "accesses": [
+        "2026-11-06 T005 one-shot, frozen MGT-BOTH-k1.0-RV3-K3"
+      ]
+    },
+    "hold": {
+      "definition": "2025-01-08..2026-09-27",
+      "status": "UNTOUCHED",
+      "accesses": []
+    },
+    "forward": {
+      "definition": "2026-11 onward paper",
+      "status": "UNTOUCHED",
+      "accesses": []
+    }
+  },
+  "candidate": {
+    "id": "MGT-BOTH-k1.0-RV3-K3",
+    "code_commit": "e8c802c",
+    "config_sha256": "c22e7ac20bef2626 (prefix)",
+    "prereg_commit": "e4cafaa"
+  },
+  "phase_gates": {
+    "S0": true,
+    "S1": true,
+    "S2": true,
+    "S3": false,
+    "S4": false,
+    "S5": false,
+    "S6": false,
+    "S7": false
+  },
+  "notes": [
+    "Record every evaluation and split access before advancing phases.",
+    "Deviation: dev incremental gate (vs always-long) failed; val run anyway at user request. val: +69.6 USD/yr, DD -36.6, diff vs LONG -10.6 -> INCONCLUSIVE. Next: hold (needs user OK) or forward paper.",
+    "Phase kept at S3: S3 gate formally failed; val result is a documented deviation, not a gate pass."
+  ]
+}

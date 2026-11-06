@@ -1,0 +1,1 @@
+{"candidate": "MGT-BOTH-k1.0-RV3-K3", "regime": "BOTH", "k": 1.0, "filter": "RV3", "K": 3, "rv3_cut": 0.0696, "levels": 6, "mult": 1.5, "tp_steps": 1, "stop_steps_beyond_last": 1, "max_hold_h": 72, "notional_per_coin_usdt": 104, "costs": {"maker": 0.0002, "taker": 0.0005, "slip_in": 0.0002, "slip_out": 0.0005, "pen": 0.0005}}

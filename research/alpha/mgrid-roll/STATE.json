@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "study_id": "mgrid-roll",
+  "created_utc": "2026-11-06T11:09:44.909551+00:00",
+  "phase": "S0_THESIS",
+  "decision": "PENDING",
+  "splits": {
+    "dev": {
+      "definition": null,
+      "status": "UNKNOWN",
+      "accesses": []
+    },
+    "val": {
+      "definition": null,
+      "status": "UNKNOWN",
+      "accesses": []
+    },
+    "hold": {
+      "definition": null,
+      "status": "UNKNOWN",
+      "accesses": []
+    },
+    "forward": {
+      "definition": null,
+      "status": "UNKNOWN",
+      "accesses": []
+    }
+  },
+  "candidate": {
+    "id": null,
+    "code_commit": null,
+    "config_sha256": null,
+    "prereg_commit": null
+  },
+  "phase_gates": {
+    "S0": false,
+    "S1": false,
+    "S2": false,
+    "S3": false,
+    "S4": false,
+    "S5": false,
+    "S6": false,
+    "S7": false
+  },
+  "notes": [
+    "Record every evaluation and split access before advancing phases."
+  ]
+}

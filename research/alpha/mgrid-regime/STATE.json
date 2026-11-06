@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "study_id": "mgrid-regime",
+  "created_utc": "2026-11-06T10:17:36.979032+00:00",
+  "phase": "S3_STRATEGY",
+  "decision": "REJECT",
+  "splits": {
+    "dev": {
+      "definition": "episode start 2020-07-01..2023-06-27 UTC, ends by 2023-06-30",
+      "status": "CONSUMED",
+      "accesses": [
+        "2026-11-06 E001-E007"
+      ]
+    },
+    "val": {
+      "definition": "episode start 2023-07-08..2024-12-28 UTC (7d embargo)",
+      "status": "UNTOUCHED",
+      "accesses": [],
+      "note": "not read for this hypothesis"
+    },
+    "hold": {
+      "definition": "episode start 2025-01-08..2026-09-27 UTC (7d embargo)",
+      "status": "UNTOUCHED",
+      "accesses": [],
+      "note": "not read for this hypothesis; period seen by other studies"
+    },
+    "forward": {
+      "definition": "2026-10 onward",
+      "status": "UNTOUCHED",
+      "accesses": []
+    }
+  },
+  "candidate": {
+    "id": null,
+    "code_commit": null,
+    "config_sha256": null,
+    "prereg_commit": null
+  },
+  "phase_gates": {
+    "S0": true,
+    "S1": true,
+    "S2": true,
+    "S3": false,
+    "S4": false,
+    "S5": false,
+    "S6": false,
+    "S7": false
+  },
+  "notes": [
+    "Record every evaluation and split access before advancing phases.",
+    "2026-11-06: S3 failed pre-registered maxDD<40 USD gate for all 12 configs; profit concentrated in 2020H2-21 alt bull; REJECT. val/hold untouched."
+  ]
+}
