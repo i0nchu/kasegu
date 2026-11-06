@@ -11,5 +11,10 @@ bust: 0.1            # equity multiple to stop out (before liquidation)
 max_days: 30         # close at market after this
 taker: 0.0005
 slip: 0.0005
+entry: maker         # limit buy at the 00:00 open; market if not filled within entry_wait bars
+tp_maker: true       # take profit as a resting limit order
+maker: 0.0002
+pen: 0.0005          # a limit counts as filled only when price trades 0.05% through it
+entry_wait: 12       # 5m bars (60 minutes)
 maintenance: 0.004   # the config is rejected if the stop would come after liquidation
 out_dir: data/bold

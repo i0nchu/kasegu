@@ -47,7 +47,10 @@ class BoldPaper:
 
     def params(self) -> ShotParams:
         c = self.cfg
-        return ShotParams(c.leverage, c.target, c.bust, c.taker, c.slip, c.max_days * 288)
+        return ShotParams(
+            c.leverage, c.target, c.bust, c.taker, c.slip, c.max_days * 288,
+            c.entry, c.tp_maker, c.maker, c.pen, c.entry_wait,
+        )  # fmt: skip
 
     async def update(self):
         s = self.shot

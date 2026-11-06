@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -7,7 +8,8 @@ from kasegu.config import ExchangeConfig
 
 
 class BoldConfig(BaseModel):
-    """Defaults: BTC 10x long, take profit at 2x equity, stop at 0.1x, 30 days max."""
+    """Defaults: BTC 10x long, take profit at 2x equity, stop at 0.1x, 30 days max.
+    Entry by limit at the 00:00 open and take profit by limit (research/alpha/bold-entry)."""
 
     symbol: str = "BTCUSDT"
     side: int = Field(1)  # +1 long, -1 short
@@ -18,6 +20,11 @@ class BoldConfig(BaseModel):
     max_days: int = Field(30, gt=0)
     taker: float = 0.0005
     slip: float = 0.0005
+    entry: Literal["market", "maker"] = "maker"  # limit at the 00:00 open, market after entry_wait
+    tp_maker: bool = True  # take profit as a resting limit
+    maker: float = 0.0002
+    pen: float = 0.0005
+    entry_wait: int = Field(12, ge=1)  # 5m bars
     maintenance: float = 0.004  # maintenance margin rate, the stop must come before liquidation
     decision_delay_s: float = 20.0
     out_dir: Path = Path("data/bold")

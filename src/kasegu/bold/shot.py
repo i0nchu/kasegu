@@ -1,8 +1,13 @@
-"""One leveraged bet, bar by bar. Enter at the open of the start bar; leave when equity reaches
-`target` (take profit) or falls to `bust` (stop before liquidation), or at the time limit.
+"""One leveraged bet, bar by bar. Leave when equity reaches `target` (take profit) or falls to
+`bust` (stop before liquidation), or at the time limit.
 
-Equity is a multiple of the stake. Costs: taker + slippage on both legs are charged up front as in
-the research, funding is added as it is paid. Within a bar the adverse extreme is checked first."""
+Entry "market": at the open of the start bar (taker + slippage). Entry "maker": a limit at the open
+of the start bar, filled when price trades `pen` beyond it within `entry_wait` bars, else market at
+the next bar open. With `tp_maker` the take profit is a resting limit (maker fee, needs `pen`
+penetration). The stop is always market (taker + slippage).
+
+Equity is a multiple of the stake. Fees are charged up front, funding is added as it is paid.
+Within a bar the adverse extreme is checked first (research/alpha/bold-entry)."""
 
 from dataclasses import asdict, dataclass
 
@@ -17,10 +22,19 @@ class ShotParams:
     taker: float = 0.0005
     slip: float = 0.0005
     max_bars: int = 30 * 288  # 30 days of 5m bars
+    entry: str = "market"  # market or maker
+    tp_maker: bool = False
+    maker: float = 0.0002
+    pen: float = 0.0005  # a limit fills only when price trades this far through it
+    entry_wait: int = 12  # bars to wait for the maker entry
 
     @property
-    def cost(self) -> float:
-        return 2 * self.leverage * (self.taker + self.slip)
+    def stop_fee(self) -> float:
+        return self.taker + self.slip
+
+    @property
+    def tp_fee(self) -> float:
+        return self.maker if self.tp_maker else self.taker + self.slip
 
 
 @dataclass
@@ -31,6 +45,9 @@ class Shot:
     params: ShotParams
     stake: float = 100.0
     p0: float | None = None
+    limit: float | None = None
+    entry_fee: float | None = None
+    fill_bar: int | None = None
     funding: float = 0.0  # equity fraction paid so far (positive = paid)
     last_bar: int | None = None
     last_close: float | None = None
@@ -45,16 +62,18 @@ class Shot:
 
     def up_move(self) -> float:
         p = self.params
-        return (p.target - 1 + p.cost + self.funding) / p.leverage
+        return (p.target - 1 + p.leverage * (self.entry_fee + p.tp_fee) + self.funding) / p.leverage
 
     def down_move(self) -> float:
         p = self.params
-        return (1 - p.bust - p.cost - self.funding) / p.leverage
+        return (1 - p.bust - p.leverage * (self.entry_fee + p.stop_fee) - self.funding) / p.leverage
 
-    def mark(self, price: float) -> float:
-        """Equity multiple if closed at price."""
+    def mark(self, price: float, fee: float | None = None) -> float:
+        """Equity multiple if closed at price (default: by market)."""
         p = self.params
-        return 1 + self.side * p.leverage * (price / self.p0 - 1) - p.cost - self.funding
+        fee = p.stop_fee if fee is None else fee
+        move = self.side * p.leverage * (price / self.p0 - 1)
+        return 1 + move - p.leverage * (self.entry_fee + fee) - self.funding
 
     def _exit(self, t, price, reason, equity):
         self.exit_time, self.exit_price, self.reason = t, price, reason
@@ -65,9 +84,15 @@ class Shot:
             return
         p = self.params
         s = self.side
-        if self.p0 is None:
-            self.p0 = o * (1 + s * p.slip)
         self.last_bar, self.last_close = t, c
+        if self.p0 is None:
+            waited = (t - self.start) // BAR_MS
+            if p.entry == "maker" and waited < p.entry_wait:
+                lim = self.limit_price(o)
+                if (low <= lim * (1 - p.pen)) if s == 1 else (h >= lim * (1 + p.pen)):
+                    self.p0, self.entry_fee, self.fill_bar = lim, p.maker, t
+                return  # exits are checked from the bar after a maker fill
+            self.p0, self.entry_fee, self.fill_bar = o * (1 + s * p.slip), p.taker + p.slip, t
         bust_px = self.p0 * (1 - s * self.down_move())
         tp_px = self.p0 * (1 + s * self.up_move())
         adv, fav = (low, h) if s == 1 else (h, low)
@@ -76,15 +101,22 @@ class Shot:
             px = o if gap else bust_px
             self._exit(t, px, "bust", self.mark(px) if gap else p.bust)
             return
-        if (fav >= tp_px) if s == 1 else (fav <= tp_px):
+        need = tp_px * (1 + s * p.pen) if p.tp_maker else tp_px
+        if (fav >= need) if s == 1 else (fav <= need):
             gap = (o > tp_px) if s == 1 else (o < tp_px)
             px = o if gap else tp_px
-            self._exit(t, px, "target", self.mark(px) if gap else p.target)
+            self._exit(t, px, "target", self.mark(px, p.tp_fee) if gap else p.target)
             return
         if funding_rate:
             self.funding += s * funding_rate * p.leverage
         if (t - self.start) // BAR_MS >= p.max_bars - 1:
             self._exit(t, c, "time", self.mark(c))
+
+    def limit_price(self, o: float) -> float:
+        """The maker entry limit: the open of the start bar (kept once seen)."""
+        if self.limit is None:
+            self.limit = o
+        return self.limit
 
     def to_dict(self) -> dict:
         return asdict(self)

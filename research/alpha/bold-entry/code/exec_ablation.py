@@ -19,7 +19,7 @@ def shot2(o, h, l, c, f, i0, L, maker_entry, maker_tp):
                 p0 = lim; j = k; break
         fe = MAKER
         if np.isnan(p0):
-            j = i0 + 12; p0 = o[j] * (1 + SLIP); fe = TAKER
+            j = i0 + 12; p0 = o[j] * (1 + SLIP); fe = TAKER + SLIP  # same convention as Shot
     else:
         p0 = o[i0] * (1 + SLIP); fe = TAKER + SLIP
     ft = MAKER if maker_tp else TAKER + SLIP

@@ -19,6 +19,12 @@ def feed(shot, bars):
     return shot
 
 
+def feed_from(shot, i0, bars):
+    for i, (o, h, low, c) in enumerate(bars, start=i0):
+        shot.on_bar(shot.start + i * BAR_MS, o, h, low, c)
+    return shot
+
+
 def test_long_target_at_ten_percent():
     s = feed(Shot("BTCUSDT", 1, 0, FREE), [(100, 100, 100, 100), (100, 110.5, 100, 110)])
     assert s.reason == "target" and s.equity == pytest.approx(2.0)
@@ -48,6 +54,37 @@ def test_costs_and_funding_move_the_levels():
     assert s.funding == pytest.approx(0.01)  # 0.1% funding x 10x
     assert s.up_move() == pytest.approx((1 + 0.02 + 0.01) / 10)
     assert s.down_move() == pytest.approx((0.9 - 0.02 - 0.01) / 10)
+
+
+def test_maker_entry_fills_on_dip_then_exits_from_next_bar():
+    p = ShotParams(leverage=10, taker=0, slip=0, maker=0, entry="maker", pen=0.001)
+    s = Shot("BTCUSDT", 1, 0, p)
+    feed(s, [(100, 100.5, 99.95, 100)])  # not 0.1% through the limit
+    assert s.p0 is None
+    feed_from(s, 1, [(100, 100.2, 99.8, 100), (100, 110.5, 100, 110)])
+    assert s.p0 == 100 and s.entry_fee == 0 and s.fill_bar == BAR_MS
+    assert s.reason == "target" and s.exit_time == 2 * BAR_MS
+
+
+def test_maker_entry_falls_back_to_market():
+    p = ShotParams(leverage=10, taker=0.0005, slip=0.0005, entry="maker", entry_wait=2)
+    s = feed(
+        Shot("BTCUSDT", 1, 0, p), [(100, 101, 100, 101), (101, 102, 101, 102), (102, 102, 102, 102)]
+    )
+    assert s.p0 == pytest.approx(102 * 1.0005) and s.entry_fee == pytest.approx(0.001)
+    assert s.fill_bar == 2 * BAR_MS
+
+
+def test_maker_take_profit_fee_and_penetration():
+    p = ShotParams(leverage=10, taker=0.0005, slip=0.0005, maker=0.0002, tp_maker=True, pen=0.0005)
+    s = feed(Shot("BTCUSDT", 1, 0, p), [(100, 100, 100, 100)])
+    tp = s.p0 * (1 + s.up_move())
+    assert s.up_move() == pytest.approx((1 + 10 * (0.001 + 0.0002)) / 10)
+    assert s.down_move() == pytest.approx((0.9 - 10 * 0.002) / 10)
+    feed_from(s, 1, [(100, tp * 1.0004, 100, 100)])  # touched but not through
+    assert s.open
+    feed_from(s, 2, [(100, tp * 1.0006, 100, 100)])
+    assert s.reason == "target" and s.equity == pytest.approx(2.0)
 
 
 def test_time_exit():
@@ -93,7 +130,7 @@ def k(t, o, h, low, c):
 async def test_paper_tries_one_at_a_time_and_restarts(tmp_path):
     clock = {"now": DAY + 30_000}
     m = Fake(clock)
-    cfg = BoldConfig(out_dir=tmp_path, taker=0, slip=0)
+    cfg = BoldConfig(out_dir=tmp_path, taker=0, slip=0, entry="market", tp_maker=False)
     bp = BoldPaper(cfg, m, now=lambda: clock["now"])
     await bp.step()
     assert bp.shot is not None and bp.shot.start == DAY
