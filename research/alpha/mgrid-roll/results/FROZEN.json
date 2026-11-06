@@ -1,0 +1,1 @@
+{"id": "MGR-K1-L3", "regime": "BOTH", "k": 1.0, "sig": "RV3", "rv3_cut": 0.0696, "timing": false, "K": 1, "L": 3.12, "compounding": "slot margin = equity/K at open, notional = L x margin", "min_notional": 104, "secondary": {"id": "MGR-K3-L3", "K": 3, "L": 3.12}}
