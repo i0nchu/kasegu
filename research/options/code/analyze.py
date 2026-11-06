@@ -26,6 +26,12 @@ def bs(S, K, T, v, call):
     return S * ncdf(d1) - K * ncdf(d2) if call else K * ncdf(-d2) - S * ncdf(-d1)
 
 
+def perp(cur):
+    p = pd.read_csv(D / f"perp_{cur}_1h.csv.gz")
+    p.index = pd.to_datetime(p.ts, unit="ms", utc=True)
+    return p
+
+
 def load(cur):
     t = pd.read_csv(D / f"opt_trades_{cur}_0809.csv.gz")
     p = t.instrument.str.split("-", expand=True)
@@ -37,9 +43,8 @@ def load(cur):
     t["dte"] = (t.expiry - t.ts).dt.total_seconds() / 86400
     S = t.first_index
     t["otm"] = np.where(t.call, t.K / S - 1, 1 - t.K / S)
-    dl = pd.read_csv(D / f"delivery_{cur}.csv.gz")
-    dl["date"] = pd.to_datetime(dl.date).dt.date
-    t["ST"] = t.expiry.dt.date.map(dict(zip(dl.date, dl.price)))
+    pp = perp(cur)
+    t["ST"] = t.expiry.map(pp.o)
     t["dte_d"] = t.dte.round().astype(int)
     t = t[(t.dte_d.isin([1, 2, 3])) & (t.otm >= 0) & (t.otm < BINS[-1]) & t.ST.notna()].copy()
     t["bucket"] = pd.cut(t.otm, BINS, labels=LAB, right=False)
@@ -101,3 +106,31 @@ def roll(t, call, dte, bucket, targets=(2, 5, 10), frac=1.0, horizon=90, start=1
 
 if __name__ == "__main__":
     pass
+
+
+def tp_mults(t, cur, tps=(2, 3, 5), ticks=1.0):
+    """Hold-to-expiry multiple plus early take-profit multiples via BS repricing at entry IV (hourly perp close)."""
+    pp = perp(cur).c
+    t = t.copy()
+    t["cost"], t["val"] = costs(t, ticks)
+    out = {k: [] for k in tps}
+    for r in t.itertuples():
+        path = pp[(pp.index > r.ts) & (pp.index < r.expiry)]
+        v = (r.first_iv or r.mean_iv) / 100
+        best = {}
+        for ts, S in path.items():
+            T = (r.expiry - ts).total_seconds() / (365 * 86400)
+            px = bs(S, r.K, T, v, r.call) / S
+            net = (px - ticks * TICK - min(0.0003, 0.125 * px)) * S
+            m = net / r.cost
+            for k in tps:
+                if k not in best and m >= k:
+                    best[k] = m
+            if len(best) == len(tps):
+                break
+        for k in tps:
+            out[k].append(best.get(k, r.val / r.cost))
+    for k in tps:
+        t[f"mult_tp{k}"] = out[k]
+    t["mult"] = t.val / t.cost
+    return t
