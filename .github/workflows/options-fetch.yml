@@ -1,0 +1,24 @@
+name: options-fetch
+on:
+  push:
+    branches: [claude/project-thread-5yjn5c]
+    paths: [research/options/code/fetch.py, .github/workflows/options-fetch.yml]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python research/options/code/fetch.py research/options/data
+      - run: |
+          git config user.name ion
+          git config user.email jiaheng921122@gmail.com
+          git add research/options/data
+          git commit -m "Add fetched option data" || exit 0
+          git pull --rebase origin claude/project-thread-5yjn5c
+          git push origin HEAD:claude/project-thread-5yjn5c
