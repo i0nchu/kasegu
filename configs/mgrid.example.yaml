@@ -1,0 +1,26 @@
+# Trend-aligned martingale grid, PAPER ONLY (research/alpha/mgrid-trend, MGT-BOTH-k1.0-RV3-K3).
+#   cp configs/mgrid.example.yaml configs/mgrid.yaml
+#   uv run kasegu --mode grid-paper --config configs/mgrid.yaml
+# Defaults are the frozen research candidate; changing them makes the paper run a new experiment.
+balance: 100.0          # USD, margin per coin = balance / slots
+slots: 3                # coins at the same time
+top: 40                 # universe: top by 30-day mean quote volume, listed >= min_age_days
+min_age_days: 60
+rv3_min: 0.0696         # 3-day realized daily vol needed (frozen dev cut)
+k: 1.0                  # step = k * 7-day daily vol, clipped to [step_floor, step_cap]
+step_floor: 0.005
+step_cap: 0.10
+btc_sma: 100            # long grids if BTC > SMA100 and coin > SMA50, short if both below
+coin_sma: 50
+max_account_loss: 40.0  # USD (realized + open); no new grids after it, 0 = off
+out_dir: data/grid
+grid:
+  levels: 6
+  mult: 1.5
+  notional: 104.0       # USDT of all 6 orders: 5, 7.5, 11.3, 16.9, 25.3, 38
+  maker: 0.0002
+  taker: 0.0005
+  slip_in: 0.0002
+  slip_out: 0.0005
+  pen: 0.0005           # limit fills only when price trades 0.05% through it
+  hold_hours: 72

@@ -19,3 +19,27 @@ services:
       options:
         max-size: 10m
         max-file: "5"
+
+  # Trend-aligned martingale grid, paper only (docs/mgrid.md). Not started by default:
+  #   cp configs/mgrid.example.yaml configs/mgrid.yaml
+  #   docker compose --profile grid up -d --build kasegu-grid
+  kasegu-grid:
+    profiles: ["grid"]
+    image: kasegu:local
+    build: .
+    restart: unless-stopped
+    command: ["--mode", "grid-paper", "--config", "configs/mgrid.yaml"]
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data  # data/grid: state.json, trades.csv, decisions.jsonl, daily.csv
+    healthcheck:
+      test: ["CMD", "python", "-m", "kasegu.health", "data/grid/status.json", "900"]
+      interval: 60s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
