@@ -1,0 +1,1 @@
+{"candidate": "MGB-G2-MA50_200", "classifier": "MA50_200", "mode": "G2", "assets": ["BTCUSDT", "ETHUSDT"], "sleeve_usd": 50, "levels": 4, "mult": 1.5, "k": 1.0, "step_floor": 0.01, "step_cap": 0.10, "costs": {"maker": 0.001, "taker": 0.001, "slip": 0.0005, "pen": 0.0005}}
