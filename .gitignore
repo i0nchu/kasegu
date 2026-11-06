@@ -22,3 +22,6 @@ data/
 
 # local config, copy from configs/config.example.yaml
 configs/config.yaml
+
+# local grid paper config, copy from configs/mgrid.example.yaml
+configs/mgrid.yaml

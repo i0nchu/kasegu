@@ -15,6 +15,7 @@ cp configs/config.example.yaml configs/config.yaml   # 本機設定，不進 git
 uv run python -m kasegu --mode paper      # 預設模式
 uv run python -m kasegu --mode backtest
 uv run python -m kasegu --mode live --confirm-live
+uv run python -m kasegu --mode grid-paper --config configs/mgrid.yaml  # 順勢網格 paper，見 docs/mgrid.md
 uv run pytest
 uv run ruff check .
 ```
@@ -90,6 +91,7 @@ uv run python -m kasegu.backtest.report data/backtests/m1_*
 uv run python -m kasegu.exchange.check --symbol BTCUSDT
 # 3. 啟動
 uv run python -m kasegu --mode live --confirm-live
+uv run python -m kasegu --mode grid-paper --config configs/mgrid.yaml  # 順勢網格 paper，見 docs/mgrid.md
 ```
 
 - `exchange.testnet: true` 時下單與行情都走 Testnet（策略價格必須來自同一本委託簿）。
@@ -168,6 +170,8 @@ export BINANCE_API_SECRET=...
 configs/config.example.yaml  # 範例配置，複製成 configs/config.yaml 使用
 configs/epr15.example.yaml   # EPR15 小額帳戶 / Shadow 範例
 configs/epr15.research.yaml  # EPR15 研究重現（非實盤建議）
+configs/mgrid.example.yaml   # 順勢馬丁格爾網格 paper（凍結研究候選）
+docs/mgrid.md                # 網格規則、執行、輸出與驗證
 docs/epr15.md                # EPR15 規格、研究版差異、Shadow 操作與上線檢查
 scripts/epr15_compare.py     # 研究模擬器與正式引擎逐筆比較
 src/kasegu/
@@ -181,6 +185,7 @@ src/kasegu/
 ├── events.py / notify.py    # 事件匯流排與告警輸出
 ├── health.py                # 容器健康檢查
 ├── backtest/                # 歷史重播
+├── grid/                    # 順勢馬丁格爾網格 paper（獨立於 engine）
 └── storage/                 # SQLite journal
 tests/
 ```

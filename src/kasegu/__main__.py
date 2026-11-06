@@ -15,7 +15,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     env = os.environ.get
     p = argparse.ArgumentParser(prog="kasegu")
     p.add_argument(
-        "--mode", choices=["backtest", "paper", "live"], default=env("KASEGU_MODE", "paper")
+        "--mode",
+        choices=["backtest", "paper", "live", "grid-paper"],
+        default=env("KASEGU_MODE", "paper"),
     )
     p.add_argument("--config", default=env("KASEGU_CONFIG", "configs/config.yaml"))
     p.add_argument("--symbols", help="comma separated, overrides config symbols")
@@ -56,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.mode == "live" and not args.confirm_live:
         log.error("live mode must be enabled explicitly with --confirm-live")
         return 2
+
+    if args.mode == "grid-paper":
+        return run_grid_paper(args.config, log)
 
     if not Path(args.config).exists():
         log.error(
@@ -129,6 +134,32 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, RuntimeError) as e:
         log.error("%s", e)
         return 2
+    return 0
+
+
+def run_grid_paper(path: str, log: logging.Logger) -> int:
+    """Trend-aligned martingale grid, paper only (research/alpha/mgrid-trend)."""
+    from kasegu.grid.config import load_grid_config
+
+    if not Path(path).exists():
+        log.error("%s not found, copy configs/mgrid.example.yaml to %s first", path, path)
+        return 2
+    cfg = load_grid_config(path)
+    from kasegu.app import until_stopped
+    from kasegu.grid.market import GridMarket
+    from kasegu.grid.paper import GridPaper
+
+    async def go():
+        market = GridMarket(cfg.exchange)
+        try:
+            await GridPaper(cfg, market).run()
+        finally:
+            await market.close()
+
+    try:
+        asyncio.run(until_stopped(go()))
+    except KeyboardInterrupt:
+        pass
     return 0
 
 
