@@ -31,9 +31,38 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--end", type=date.fromisoformat, help="backtest end (UTC day)")
     p.add_argument("--label", default="", help="backtest name prefix, e.g. exp1")
     p.add_argument("--each", action="store_true", help="backtest each symbol separately")
+    p.add_argument(
+        "--reset-account-stop",
+        action="store_true",
+        help="clear the risk.max_account_loss stop in this mode's journal and exit",
+    )
     p.add_argument("--log-level", default=env("KASEGU_LOG_LEVEL", "INFO"))
     p.add_argument("--log-file", default=env("KASEGU_LOG_FILE"), help="rotating log file")
     return p.parse_args(argv)
+
+
+def reset_stop(cfg, log) -> int:
+    """Clear the account loss stop of the journal this mode uses (live has one per venue)."""
+    from kasegu.core.engine import reset_account_stop
+    from kasegu.storage.journal import Journal
+
+    db = cfg.db_path
+    if cfg.mode == "live":
+        venue = "testnet" if cfg.exchange.testnet else "mainnet"
+        db = db.with_name(f"{db.stem}-{venue}{db.suffix}")
+    if not db.exists():
+        log.error("%s not found, nothing to reset", db)
+        return 2
+    j = Journal(db)
+    prev, base = reset_account_stop(j)
+    j.close()
+    log.warning(
+        "%s: account stop cleared (was: %s), losses count from realized %.4f USDT",
+        db,
+        prev or "not stopped",
+        base,
+    )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,8 +91,14 @@ def main(argv: list[str] | None = None) -> int:
             "%s not found, copy configs/config.example.yaml to %s first", args.config, args.config
         )
         return 2
-    cfg = load_config(args.config)
+    try:
+        cfg = load_config(args.config)
+    except ValueError as e:  # pydantic ValidationError, e.g. removed risk keys
+        log.error("invalid config %s: %s", args.config, e)
+        return 2
     cfg.mode = args.mode
+    if args.reset_account_stop:
+        return reset_stop(cfg, log)
     if args.symbols:
         cfg.symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     if args.strategy and args.strategy != cfg.strategy.id:

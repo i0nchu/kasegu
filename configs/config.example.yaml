@@ -40,8 +40,8 @@ risk:
   margin_budget: 30
   leverage: 10
   max_leverage: 10
-  max_positions: 1
-  max_notional: 350
+  max_symbol_notional: 350   # per symbol: open position + resting entry, USDT, 0 = off
+  max_account_loss: 0        # USDT, net since the last reset incl. open pnl; stops the strategy
   max_spread_pct: 0.05
   min_quote_qty: 0.0
   stale_after_s: 10

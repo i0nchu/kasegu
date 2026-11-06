@@ -120,6 +120,39 @@ uv run python -m kasegu --mode live --confirm-live
 - `risk.max_loss_per_trade`：以固定停損價估算的單筆虧損上限（USDT），提高槓桿不會繞過；
   不含跳空與滑價，實際損失可能更大。
 
+### 資金與曝險
+
+每個幣種有自己的投入資金與曝險上限，沒有全帳戶的持倉數限制（舊的 `max_positions`、`max_notional` 已移除，
+設定檔裡還有這兩項會在啟動時報錯）。
+
+| 設定 | 範圍 | 意義 |
+|---|---|---|
+| `risk.margin_budget` | 每幣預設 | 每筆保證金（USDT），名義 = 保證金 × `leverage` × (1 − `cost_reserve_pct`) |
+| `risk.max_symbol_notional` | 每幣預設 | 該幣持倉 + 掛單中的名義上限（USDT），0 = 關閉 |
+| `risk.symbols.<SYMBOL>` | 單一幣種 | 覆寫 `margin_budget`、`max_notional`；只能寫 `symbols` 裡有的幣 |
+| `risk.max_account_loss` | 全帳戶 | 總虧損上限（USDT），見下 |
+
+```yaml
+risk:
+  margin_budget: 10
+  max_symbol_notional: 20
+  symbols:
+    SOLUSDT: {margin_budget: 15, max_notional: 30}
+  max_account_loss: 10
+```
+
+`max_account_loss`：這個 journal 從上次重設以來所有已平倉交易的淨損益，加上目前持倉以標記價格計算的浮動損益，
+小於等於 −`max_account_loss` 時立刻撤掉所有進場單、以 reduce-only 市價單平掉所有倉位，並停止策略（`account_stop` critical 告警）。
+停止狀態存在 journal，重啟後仍維持停止；確認原因後用下面的指令重設，之後的虧損從重設當下重新計算：
+
+```bash
+uv run python -m kasegu --mode paper --config configs/epr15.yaml --reset-account-stop
+uv run python -m kasegu --mode live --config configs/epr15.yaml --reset-account-stop   # 依 exchange.testnet 選 testnet / mainnet journal
+```
+
+所有幣種都可能同時掛單、在急殺時同時成交，所以最壞情況是各幣 `max_symbol_notional` 的總和乘上跳空幅度；
+`max_account_loss` 是在這之後的最後一道停損，不會阻止同一分鐘內多幣同時虧損。
+
 ## Docker 部署
 
 ```bash

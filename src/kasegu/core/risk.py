@@ -24,7 +24,7 @@ class RiskManager:
 
     def size(self, symbol: str, price: float) -> float:
         c = self.cfg
-        notional = c.margin_budget * c.leverage * (1 - c.cost_reserve_pct / 100)
+        notional = c.budget(symbol) * c.leverage * (1 - c.cost_reserve_pct / 100)
         return self.rules[symbol].qty(notional / price)
 
     def untradable(self, prices: dict[str, float]) -> dict[str, str]:
@@ -40,7 +40,6 @@ class RiskManager:
         self,
         sig: Signal,
         quote: Quote | None,
-        open_count: int,
         exposure: float,
         stale: bool = False,
         unknown: bool = False,
@@ -54,9 +53,6 @@ class RiskManager:
             return None, f"spread {quote.spread_pct:.4f}%"
         if min(quote.bid_qty, quote.ask_qty) < c.min_quote_qty:
             return None, "liquidity"
-        if open_count >= c.max_positions:
-            return None, "max_positions"
-
         if sig.side is Side.BUY:
             price = r.price_down(sig.limit_price)
             if price >= quote.ask:
@@ -72,8 +68,10 @@ class RiskManager:
         err = r.valid(price, qty)
         if err:
             return None, err
-        if exposure + price * qty > c.max_notional:
-            return None, "max_notional"
+        cap = c.symbol_cap(sig.symbol)
+        if cap and exposure + price * qty > cap:
+            # exposure: this symbol's open position and resting entry
+            return None, "max_symbol_notional"
         if c.max_loss_per_trade and price * qty * self.stop_loss_pct / 100 > c.max_loss_per_trade:
             # more leverage means more notional, so it cannot get around this
             return None, "max_loss_per_trade"

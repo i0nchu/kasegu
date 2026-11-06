@@ -59,7 +59,7 @@ def engine_cfg(symbol: str, d: date):
     cfg.backtest.start = cfg.backtest.end = d
     r = cfg.risk
     # one coin per run, no global caps, like the research
-    r.max_positions, r.max_notional, r.max_loss_per_trade = 1, 1e9, 0
+    r.max_symbol_notional, r.max_account_loss, r.max_loss_per_trade = 0, 0, 0
     r.max_daily_loss, r.max_consecutive_losses = 0, 0
     r.max_spread_pct = 1.0
     # replay quotes only move with trades; a quiet minute is not stale data here

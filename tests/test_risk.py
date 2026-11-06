@@ -37,12 +37,37 @@ def test_short_rounds_up():
     ],
 )
 def test_blocks(kw, args, reason):
-    assert rm(**kw).check(sig(), Q, 0, 0, **args) == (None, reason)
+    assert rm(**kw).check(sig(), Q, 0, **args) == (None, reason)
+
+
+def test_per_symbol_budget_and_cap():
+    cfg = RiskConfig(
+        margin_budget=20,
+        leverage=5,
+        cost_reserve_pct=0,
+        max_symbol_notional=1000,
+        symbols={"btcusdt": {"margin_budget": 10, "max_notional": 40}},
+    )
+    r = RiskManager(cfg, RULES)
+    assert cfg.budget("BTCUSDT") == 10 and cfg.budget("ETHUSDT") == 20
+    assert cfg.symbol_cap("BTCUSDT") == 40 and cfg.symbol_cap("ETHUSDT") == 1000
+    # 10 x 5 = 50 USDT per trade on BTC, above its own 40 cap
+    assert r.check(sig(), Q, 0)[1] == "max_symbol_notional"
+
+
+def test_removed_keys_are_refused():
+    with pytest.raises(ValueError, match="max_positions was removed"):
+        RiskConfig(max_positions=3)
+    with pytest.raises(ValueError, match="max_notional was removed"):
+        RiskConfig(max_notional=500)
+    with pytest.raises(ValueError):
+        RiskConfig(max_postions=3)  # typos are refused too
 
 
 def test_limits():
-    assert rm(max_positions=1).check(sig(), Q, 1, 0)[1] == "max_positions"
-    assert rm(max_notional=150).check(sig(), Q, 0, 100)[1] == "max_notional"
+    # 1.01 x 99 = 100 USDT order: fits a 150 cap when flat, not on top of 100 already there
+    assert rm(max_symbol_notional=150).check(sig(), Q, 0)[1] == "ok"
+    assert rm(max_symbol_notional=150).check(sig(), Q, 100)[1] == "max_symbol_notional"
     wide = Quote("BTCUSDT", 99.0, 100.0, 10, 10, 0)
     assert rm().check(sig(), wide, 0, 0)[1].startswith("spread")
     assert rm().check(sig(px=100.5), Q, 0, 0)[1] == "would_take"

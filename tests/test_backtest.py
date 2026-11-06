@@ -96,7 +96,7 @@ async def test_replay_end_to_end():
         symbols=[S],
         strategy={"k": 0.5},
         fee={"slippage_pct": 0.0},
-        risk={"max_spread_pct": 1.0, "max_notional": 1e9},
+        risk={"max_spread_pct": 1.0},
     )
     rules = {S: SymbolRules(S, 0.01, 0.001, 0.001, 1e6, 5)}
     calls = []

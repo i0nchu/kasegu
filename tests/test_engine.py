@@ -29,7 +29,7 @@ def setup(n=800, **cfg_kw):
     cfg = AppConfig(
         symbols=[S],
         fee={"slippage_pct": 0.0},
-        risk={"margin_budget": 20, "leverage": 5, "max_spread_pct": 1.0, "max_notional": 1e6},
+        risk={"margin_budget": 20, "leverage": 5, "max_spread_pct": 1.0},
         **cfg_kw,
     )
     md = MarketData([S])

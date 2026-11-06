@@ -30,10 +30,18 @@ risk:
   margin_budget: 10
   leverage: 2
   max_leverage: 3
-  # resting entries count as positions and as exposure: in a crash every resting buy can
-  # fill at once, so max_positions x notional is the real worst case (here 6 x 19.8)
-  max_positions: 6
-  max_notional: 120
+  # exposure cap per symbol (open position + resting entry, USDT notional), 0 = off.
+  # Every symbol can rest an entry at once and in a crash all of them can fill together,
+  # so the real worst case is the sum over symbols (here 6 x 19.8)
+  max_symbol_notional: 20
+  # per symbol overrides of margin_budget / max_notional, e.g.
+  #   symbols:
+  #     SOLUSDT: {margin_budget: 15, max_notional: 30}
+  symbols: {}
+  # account stop: net of all trades in this journal since the last reset + open pnl at or
+  # below -max_account_loss USDT cancels entries, closes positions and stops the strategy
+  # (stays stopped after a restart; clear with `python -m kasegu --reset-account-stop`)
+  max_account_loss: 10
   # estimate at the 3% stop price only: gaps, mark price lag and slippage come on top
   # (the engine replay saw stop fills down to -6.4%), see docs/epr15.md
   max_loss_per_trade: 0.7

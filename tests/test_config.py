@@ -53,5 +53,7 @@ def test_load_epr15_configs():
     r = cfg.risk
     assert notional(r) < 50 and r.leverage <= r.max_leverage <= 3
     assert notional(r) * cfg.exit.stop_loss_pct / 100 <= r.max_loss_per_trade
-    assert r.max_positions * notional(r) <= r.max_notional
+    # every symbol can hold one trade, the sum of the caps is the worst case
+    assert notional(r) <= r.max_symbol_notional < 2 * notional(r)
+    assert 0 < r.max_account_loss <= len(cfg.symbols) * r.max_symbol_notional
     assert r.max_daily_loss > 0 and r.max_consecutive_losses > 0
