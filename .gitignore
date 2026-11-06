@@ -25,3 +25,4 @@ configs/config.yaml
 
 # local grid paper config, copy from configs/mgrid.example.yaml
 configs/mgrid.yaml
+configs/bold.yaml

@@ -16,7 +16,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="kasegu")
     p.add_argument(
         "--mode",
-        choices=["backtest", "paper", "live", "grid-paper"],
+        choices=["backtest", "paper", "live", "grid-paper", "bold-paper"],
         default=env("KASEGU_MODE", "paper"),
     )
     p.add_argument("--config", default=env("KASEGU_CONFIG", "configs/config.yaml"))
@@ -90,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mode == "grid-paper":
         return run_grid_paper(args.config, log)
+    if args.mode == "bold-paper":
+        return run_bold_paper(args.config, log)
 
     if not Path(args.config).exists():
         log.error(
@@ -188,6 +190,36 @@ def run_grid_paper(path: str, log: logging.Logger) -> int:
         market = GridMarket(cfg.exchange)
         try:
             await GridPaper(cfg, market).run()
+        finally:
+            await market.close()
+
+    try:
+        asyncio.run(until_stopped(go()))
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+def run_bold_paper(path: str, log: logging.Logger) -> int:
+    """One-shot leveraged bet to double the stake, paper only (research/alpha/mgrid-bold)."""
+    from kasegu.bold.config import load_bold_config
+
+    if not Path(path).exists():
+        log.error("%s not found, copy configs/bold.example.yaml to %s first", path, path)
+        return 2
+    try:
+        cfg = load_bold_config(path)
+    except ValueError as e:
+        log.error("%s", e)
+        return 2
+    from kasegu.app import until_stopped
+    from kasegu.bold.paper import BoldPaper
+    from kasegu.grid.market import GridMarket
+
+    async def go():
+        market = GridMarket(cfg.exchange)
+        try:
+            await BoldPaper(cfg, market).run()
         finally:
             await market.close()
 
