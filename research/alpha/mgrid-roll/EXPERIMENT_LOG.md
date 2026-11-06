@@ -14,3 +14,4 @@
 | UTC | Split | 操作 | 已看結果？ |
 |---|---|---|---|
 | 2026-11-06 11:15 | val | R006 一次性重算（MGR-K1-L3、MGR-K3-L3 + MGT/LONG 對照，基準與壓測成本） | 是（val 先前已被 mgrid-trend 消耗；本次為非獨立重算） |
+| 2026-11-06 11:20 | hold | R007 使用者同意（決策卡選「兩個都做」）後一次性回測 MGR-K1-L3 / MGR-K3-L3 + MGT/LONG 對照；判定沿用 HYPOTHESIS.md（CAGR>0、maxDD>−60%、勝過同 sizing 永遠做多） | 執行中 |
