@@ -1,46 +1,25 @@
-# Research results — bold-entry
+# Results — bold-entry
 
-## Decision
+判定：**REJECT（S2 未過）**。val、hold 對這 8 個因子仍未使用。
 
-- `CONTINUE / PROMOTE / INCONCLUSIVE / REJECT / RETIRE`：
-- 目前階段：
-- 下一個允許的實驗：
-- 為何不是無條件可用 Alpha：
+## 進場因子（dev 2020-07 ~ 2023-05，BTC 10x：全體 HIT 43.9%，30 天到期 7.4%）
 
-## Reproducibility
+| 因子 | 有利三分位 HIT − 全體 | NW t | ETH | 2020H2-21 / 2022 / 2023H1 |
+|---|---|---|---|---|
+| RET30（動能，高） | +7.0pp | 1.48 | +6.6 | +6.2 / **−26.5** / +8.8 |
+| VOLR（低） | +2.8 | 0.84 | +1.5 | +4.7 / +4.7 / −2.9 |
+| DIST200（高） | +2.6 | 0.46 | +3.5 | −0.2 / n/a / −9.9 |
+| RV7（低） | +2.5 | 0.50 | +5.4 | +14.1 / +2.1 / −5.1 |
+| DD30（淺） | +1.1 | 0.20 | +9.7 | +8.0 / −26.4 / +5.2 |
+| FUND3（低） | −0.8 | −0.22 | −7.2 | +8.0 / +3.3 / −1.8 |
+| RET3（跌後） | −0.6 | −0.16 | −4.7 | −2.5 / +5.3 / −9.0 |
+| BREADTH（高） | −5.1 | −1.00 | +1.2 | −3.9 / −22.6 / +5.9 |
 
-- Code commit / config SHA / data snapshot：
-- Dev / Val / Hold / Forward peek audit：
-- 事件數 / 獨立群數 / 交易數 / 時間範圍：
-- 訊號生成與交易帳本路徑：
-- 錯誤修正與歷史結果重算版本：
+20x（事件平均 2 天）也沒有因子過關（最好 RV7 低 +8.3pp，Holm p 0.39，2023H1 反向）。
 
-## 主要績效（註明是哪個 split；不可用合併績效代替）
+## 執行面（不是 Alpha，是少付成本）
 
-| Metric | Dev | Val | Hold | Forward | Baseline |
-|---|---|---|---|---|---|
-| Mean gross price PnL / trade | | | | | |
-| Fees + slippage + funding / trade | | | | | |
-| Mean net trade return | | | | | |
-| Mean net R | | | | | |
-| Net expectancy CI, cluster unit | | | | | |
-| Win rate / win-loss ratio | | | | | |
-| Profit factor | | | | | |
-| Annualized / Sharpe | | | | | |
-| Max drawdown / worst trade | | | | | |
-| Baseline incremental net PnL | | | | | |
-| Exposure / capacity / turnover | | | | | |
-
-## 因子歸因與反例
-
-- 最小對照 / ablation：
-- 市場 beta、替代基準：
-- 不同年度、類別、流動性、行情：
-- 前 10 最好日/最差日、右尾/左尾：
-- 交易成本與撮合壓力：
-- 不足與已看過的數據：
-
-## 重新測試禁令
-
-- 已消耗的 val/hold 及相關假設：
-- 新研究若使用同段資料，不能宣稱獨立驗證：
+| | BTC 10x | BTC 20x | ETH 10x | ETH 20x |
+|---|---|---|---|---|
+| 兩邊市價 | 43.9% | 47.2% | 48.4% | 45.4% |
+| 限價進場 + 限價止盈 | 45.2% | 48.0% | 48.7% | 46.3% |
