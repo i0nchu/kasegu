@@ -7,14 +7,14 @@
   "splits": {
     "dev": {
       "definition": "2020-07-01..2023-06-27",
-      "status": "USED",
+      "status": "CONTAMINATED",
       "accesses": [
         "R001-R005"
       ]
     },
     "val": {
       "definition": "2023-07-08..2024-12-28",
-      "status": "CONSUMED (previously by mgrid-trend; R006 non-independent recompute)",
+      "status": "CONSUMED",
       "accesses": [
         "R006"
       ]
@@ -26,7 +26,7 @@
     },
     "forward": {
       "definition": null,
-      "status": "NOT_STARTED",
+      "status": "UNTOUCHED",
       "accesses": []
     }
   },
@@ -48,6 +48,7 @@
   },
   "notes": [
     "Record every evaluation and split access before advancing phases.",
-    "Selection composite and BTCRV7 timing failed S3 incremental gate; candidate = MGT signal + compounding K1 L3.12. Hold needs user OK."
+    "Selection composite and BTCRV7 timing failed S3 incremental gate; candidate = MGT signal + compounding K1 L3.12. Hold needs user OK.",
+    "val previously consumed by mgrid-trend; R006 is a non-independent recompute."
   ]
 }
